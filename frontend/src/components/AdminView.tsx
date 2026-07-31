@@ -392,7 +392,7 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
 
               <div className="photo-gallery-grid">
                 {currentPhotos.map((url, idx) => (
-                  <div key={idx} className="gallery-item" style={{ position: 'relative' }}>
+                  <div key={idx} className="gallery-item">
                     <img src={url} alt={`Photo ${idx + 1}`} />
                     <button
                       type="button"
@@ -419,6 +419,29 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
                     </button>
                   </div>
                 ))}
+              </div>
+                
+              {/* Add Photo Inputs */}
+              <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <label className="btn-secondary" style={{ cursor: 'pointer', margin: 0, padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}>
+                    {isUploadingPhoto ? 'Uploading...' : '📁 Upload Local File'}
+                    <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} disabled={isUploadingPhoto} />
+                  </label>
+                </div>
+
+                <form onSubmit={handleAddPhotoFromUrl} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                  <input
+                    type="url"
+                    placeholder="Or paste image URL (e.g. https://...)"
+                    value={photoUrlInput}
+                    onChange={(e) => setPhotoUrlInput(e.target.value)}
+                    style={{ flex: 1, padding: '0.4rem 0.6rem', fontSize: '0.85rem', textAlign: 'left', letterSpacing: 'normal' }}
+                  />
+                  <button type="submit" className="btn-secondary-sm" disabled={!photoUrlInput.trim()}>
+                    Add Photo
+                  </button>
+                </form>
               </div>
             </div>
 
