@@ -1,0 +1,412 @@
+/* ==========================================================================
+   ADMIN / INSPECTOR MODAL STYLES (SONIC ASSISTANT DISCIPLINE)
+   ========================================================================== */
+
+/* Darkened backdrop with blur overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Floating Surface Card */
+.modal-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 24px;
+  padding: 1.75rem;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: var(--shadow-hover);
+  max-height: 88vh;
+  overflow-y: auto;
+  color: var(--text-main);
+}
+
+/* Inspector Header */
+.inspector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.inspector-header h2 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+/* Delete Person Badge Button */
+.btn-danger-sm {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--accent-danger);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  padding: 0.4rem 0.85rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-danger-sm:hover {
+  background: var(--accent-danger);
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.btn-danger-sm:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+/* Section Containers (Layered Pastel Panels) */
+.inspector-section {
+  background: var(--bg-alt);
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  padding: 1.15rem;
+  margin-bottom: 1.25rem;
+  box-shadow: var(--shadow);
+}
+
+.inspector-section h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.2rem;
+}
+
+.section-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+/* Photo Gallery Grid */
+.photo-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.gallery-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: all 0.2s ease;
+  background: var(--bg-surface);
+}
+
+.gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gallery-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.gallery-item:active {
+  transform: translateY(2px);
+}
+
+.gallery-item.active {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+.active-badge {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: var(--accent-primary);
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 8px;
+}
+
+/* Input Fields */
+.input-field {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  padding: 0.65rem 1rem;
+  border-radius: 20px;
+  color: var(--text-main);
+  font-size: 0.9rem;
+  outline: none;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow);
+}
+
+.input-field:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* Standardized Buttons (Hover Lift + Active Push Down) */
+.btn-primary, .btn-secondary {
+  border: none;
+  border-radius: 20px;
+  padding: 0.75rem 1.25rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: #ffffff;
+  box-shadow: var(--shadow);
+  width: 100%;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+.btn-secondary {
+  background: var(--bg-surface);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-surface-hover);
+  border-color: var(--accent-primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.btn-secondary:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+/* ==========================================================================
+   BUTTON ACTIVE EFFECTS (MATCHING QUERY-CARD TACTILE PRESS)
+   ========================================================================== */
+
+/* Base transitions for all modal buttons */
+.btn-primary,
+.btn-secondary,
+.btn-danger-sm,
+.btn-secondary-sm,
+.clip-play-btn {
+  transition: all 0.2s ease;
+}
+
+/* --- 1. Primary Button --- */
+.btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+/* --- 2. Secondary Button --- */
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-surface-hover);
+  border-color: var(--accent-primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.btn-secondary:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+/* --- 3. Danger / Delete Badge Button --- */
+.btn-danger-sm:hover:not(:disabled) {
+  background: var(--accent-danger);
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.btn-danger-sm:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+/* --- 4. Small Secondary Button (e.g., "Use" clip button) --- */
+.btn-secondary-sm:hover:not(:disabled) {
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-hover);
+}
+
+.btn-secondary-sm:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+/* --- 5. Circular Audio Play Button --- */
+.clip-play-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.clip-play-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+/* Audio Clips List Items */
+.audio-clips-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.audio-clip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 0.85rem;
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  transition: all 0.2s ease;
+}
+
+.audio-clip-row:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-hover);
+}
+
+.audio-clip-row.active {
+  border-color: var(--accent-primary);
+  background: #f0f9ff;
+}
+
+.clip-play-btn {
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  box-shadow: var(--shadow);
+  transition: all 0.2s ease;
+}
+
+.clip-play-btn:hover {
+  transform: scale(1.05);
+}
+
+.clip-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.clip-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.active-pill {
+  font-size: 0.65rem;
+  background: var(--accent-success);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.btn-secondary-sm {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 0.25rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary-sm:hover {
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+.btn-icon-danger {
+  background: none;
+  border: none;
+  color: var(--accent-danger);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.btn-icon-danger:hover {
+  opacity: 1;
+}
+
+/* Recording Pulse State */
+.recording-active {
+  background: var(--accent-danger) !important;
+  animation: pulse-red 1.5s infinite;
+}
+
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
