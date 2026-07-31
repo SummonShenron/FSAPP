@@ -20,7 +20,11 @@ app = FastAPI(title="Family Soundboard API")
 pin = os.getenv("ADMIN_PIN")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://fsapp-nu.vercel.app",  # Your production Vercel app
+        "http://localhost:5173",         # Local Vite dev server
+        "http://localhost:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -79,24 +83,61 @@ def get_sound_cards(current_user: dict = Depends(get_current_user)):
     return cards
 
 @app.post("/api/cards")
-def create_sound_card(payload: SoundCardCreate, current_user: dict = Depends(get_current_user)):
+async def create_sound_card(
+    title: str = Form(...),
+    relation: str = Form(""),
+    photo_url: Optional[str] = Form(None),
+    bg_color: Optional[str] = Form("#dbeafe"),
+    fact: Optional[str] = Form(""),
+    file: Optional[UploadFile] = File(None),
+    current_user: dict = Depends(get_current_user)
+):
     db = get_db()
     if db is None:
         raise HTTPException(status_code=500, detail="Database disabled")
+
     try:
-        new_card = payload.dict()
-        new_card["user_id"] = current_user["sub"]
-        new_card["audio_url"] = None
-        # Initialize facts array if a single fact was provided
-        if new_card.get("fact") and not new_card.get("facts"):
-            new_card["facts"] = [new_card["fact"]]
+        final_photo_url = photo_url
+
+        # 1. If an image file was uploaded, stream it straight into GridFS
+        if file and file.filename:
+            fs = gridfs.GridFS(db)
+            file_id = fs.put(
+                await file.read(),
+                filename=file.filename,
+                content_type=file.content_type
+            )
+            final_photo_url = f"/api/photo/{str(file_id)}"
+
+        if not final_photo_url:
+            raise HTTPException(status_code=400, detail="Must provide either a photo URL or upload an image file")
+
+        # 2. Build the MongoDB document
+        new_card = {
+            "title": title,
+            "relation": relation,
+            "photo_url": final_photo_url,
+            "photo_urls": [final_photo_url],
+            "bg_color": bg_color,
+            "fact": fact,
+            "facts": [fact] if fact else [],
+            "user_id": current_user["sub"],
+            "audio_url": None
+        }
+
+        # 3. Save to MongoDB sound_cards collection
         result = db.sound_cards.insert_one(new_card) 
         new_card["id"] = str(result.inserted_id)
         del new_card["_id"]
-        logger.info(f"Created card {new_card['id']} for user {current_user['sub']}")
+
+        logger.info(f"Created card {new_card['id']} with GridFS image for user {current_user['sub']}")
+        return new_card
+
+    except HTTPException as he:
+        raise he
     except Exception as e:
-        logger.error(f"Failed to create new card {e}")
-    return new_card
+        logger.error(f"Failed to create new card: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create card")
 
 @app.post("/api/cards/reorder")
 def reorder_cards(payload: CardOrderUpdate):
