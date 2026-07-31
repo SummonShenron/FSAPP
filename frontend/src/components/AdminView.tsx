@@ -30,11 +30,14 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
   const [newPhotoUrl, setNewPhotoUrl] = useState('');
   const [newFact, setNewFact] = useState('');
 
-  // Audio Recording State
+  // Audio Recording & Upload State
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [timerInterval, setTimerInterval] = useState<number | null>(null);
+  const [audioUrlInput, setAudioUrlInput] = useState('');
+  const [audioLabelInput, setAudioLabelInput] = useState('');
+  const [isUploadingAudioFile, setIsUploadingAudioFile] = useState(false);
 
   const activeCard = inspectingCard
     ? cards.find((c) => c.id === inspectingCard.id) || null
@@ -44,57 +47,51 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-        // apiFetch automatically prepends your Render backend URL
-        await apiFetch('/api/admin/verify', {
+      await apiFetch('/api/admin/verify', {
         method: 'POST',
         body: JSON.stringify({ pin: pinInput }),
-        });
+      });
 
-        setIsUnlocked(true);
-        setPinError(null);
+      setIsUnlocked(true);
+      setPinError(null);
     } catch (err) {
-        setPinError('Incorrect PIN');
+      setPinError('Incorrect PIN');
     }
-    };
+  };
 
   // --- 2. CARD MANAGEMENT ---
   const handleCreateCard = async (e: React.FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  try {
-    const formData = new FormData();
-    formData.append('title', newTitle);
-    formData.append('relation', newRelation || '');
-    formData.append('bg_color', '#ffffff');
-    formData.append('fact', newFact || '');
+    try {
+      const formData = new FormData();
+      formData.append('title', newTitle);
+      formData.append('relation', newRelation || '');
+      formData.append('bg_color', '#ffffff');
+      formData.append('fact', newFact || '');
 
-    // If a physical file was picked, attach it
-    if (selectedFile) {
-      formData.append('file', selectedFile);
-    } else {
-      // Otherwise fallback to the URL or default placeholder
-      formData.append('photo_url', newPhotoUrl || 'https://via.placeholder.com/150');
+      if (selectedFile) {
+        formData.append('file', selectedFile);
+      } else {
+        formData.append('photo_url', newPhotoUrl || 'https://via.placeholder.com/150');
+      }
+
+      await apiFetch('/api/cards', {
+        method: 'POST',
+        body: formData,
+      });
+
+      setShowAddModal(false);
+      setNewTitle('');
+      setNewRelation('');
+      setNewPhotoUrl('');
+      setNewFact('');
+      setSelectedFile(null);
+      onRefresh();
+    } catch (err) {
+      alert('Failed to create card');
     }
-
-    await apiFetch('/api/cards', {
-      method: 'POST',
-      // CRITICAL: Do NOT include 'Content-Type': 'application/json'!
-      // Leaving headers blank (or omitting Content-Type) allows the browser 
-      // to automatically set 'multipart/form-data' with the correct boundary.
-      body: formData,
-    });
-
-    setShowAddModal(false);
-    setNewTitle('');
-    setNewRelation('');
-    setNewPhotoUrl('');
-    setNewFact('');
-    setSelectedFile(null); // Reset file selection
-    onRefresh();
-  } catch (err) {
-    alert('Failed to create card');
-  }
-};
+  };
 
   const handleDeleteCard = async (cardId: string) => {
     if (!confirm('Are you sure you want to delete this person?')) return;
@@ -116,7 +113,7 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
 
     setIsUploadingPhoto(true);
     try {
-        await apiFetch(`/api/cards/${activeCard.id}/photos`, {
+      await apiFetch(`/api/cards/${activeCard.id}/photos`, {
         method: 'POST',
         body: formData,
       });
@@ -154,6 +151,10 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
 
   const handleDeletePhoto = async (urlToDelete: string) => {
     if (!activeCard) return;
+    const currentPhotos = activeCard.photo_urls?.length 
+      ? activeCard.photo_urls 
+      : (activeCard.photo_url ? [activeCard.photo_url] : []);
+
     if (currentPhotos.length <= 1) {
       alert('Cards must keep at least one photo!');
       return;
@@ -230,6 +231,47 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
       onRefresh();
     } catch (err) {
       alert('Failed to delete clip');
+    }
+  };
+
+  const handleAudioFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!activeCard || !e.target.files?.[0]) return;
+    const file = e.target.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+
+    setIsUploadingAudioFile(true);
+    try {
+      await apiFetch(`/api/cards/${activeCard.id}/audio`, {
+        method: 'POST',
+        body: formData,
+      });
+      onRefresh();
+    } catch (err) {
+      alert('Failed to upload audio file');
+    } finally {
+      setIsUploadingAudioFile(false);
+    }
+  };
+
+  const handleAddAudioUrl = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeCard || !audioUrlInput.trim()) return;
+
+    try {
+      await apiFetch(`/api/cards/${activeCard.id}/audio-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: audioUrlInput.trim(),
+          label: audioLabelInput.trim() || 'External Clip',
+        }),
+      });
+      setAudioUrlInput('');
+      setAudioLabelInput('');
+      onRefresh();
+    } catch (err) {
+      alert('Failed to add audio URL');
     }
   };
 
@@ -392,7 +434,7 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
 
               <div className="photo-gallery-grid">
                 {currentPhotos.map((url, idx) => (
-                  <div key={idx} className="gallery-item">
+                  <div key={idx} className="gallery-item" style={{ position: 'relative' }}>
                     <img src={url} alt={`Photo ${idx + 1}`} />
                     <button
                       type="button"
@@ -420,7 +462,7 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
                   </div>
                 ))}
               </div>
-                
+
               {/* Add Photo Inputs */}
               <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -462,7 +504,6 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        // justify: 'space-between',
                         backgroundColor: '#f9fafb',
                         border: '1px solid #e5e7eb',
                         padding: '0.5rem 0.75rem',
@@ -496,22 +537,22 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
 
             {/* Voice Clips Section */}
             <div className="inspector-section">
-              <h3>🎤 Voice Clips</h3>
-              <p className="section-desc">Record sound bites for guessing</p>
+              <h3>🎤 Voice & Video Clips</h3>
+              <p className="section-desc">Record, upload files (.mp3, .mp4), or paste URLs</p>
 
               {currentAudioClips.length === 0 ? (
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>
-                  No voice clips recorded yet.
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontStyle: 'italic', marginBottom: '1rem' }}>
+                  No voice clips added yet.
                 </div>
               ) : (
-                <div className="audio-clips-list">
-                  {currentAudioClips.map((clip, idx) => (
+                <div className="audio-clips-list" style={{ marginBottom: '1rem' }}>
+                  {currentAudioClips.map((clip: any, idx: number) => (
                     <div key={clip.id || idx} className="audio-clip-row">
                       <button 
                         type="button" 
                         className="clip-play-btn" 
                         onClick={() => {
-                          const audioPath = (clip as any).audio_url || (clip as any).url;
+                          const audioPath = clip.audio_url || clip.url;
                           const fullUrl = audioPath?.startsWith('http') 
                             ? audioPath 
                             : `http://192.168.1.6:8000${audioPath}`;
@@ -531,18 +572,62 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
                 </div>
               )}
 
-              <div style={{ marginTop: '1rem' }}>
-                {isRecording ? (
-                  <button type="button" className="btn-primary recording-active" onClick={stopRecording}>
-                    <span className="recording-dot" /> ⏹️ Stop Recording ({recordingSeconds}s)
-                  </button>
-                ) : (
-                  <button type="button" className="btn-primary" onClick={startRecording}>
-                    🎤 Record New Voice Clip
-                  </button>
-                )}
+              {/* Upload Controls */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
+                {/* Live Recording Button */}
+                <div>
+                  {isRecording ? (
+                    <button type="button" className="btn-primary recording-active" onClick={stopRecording} style={{ width: '100%' }}>
+                      <span className="recording-dot" /> ⏹️ Stop Recording ({recordingSeconds}s)
+                    </button>
+                  ) : (
+                    <button type="button" className="btn-primary" onClick={startRecording} style={{ width: '100%' }}>
+                      🎤 Record Live Voice Clip
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ textAlign: 'center', fontSize: '0.85rem', color: '#6b7280' }}>— OR —</div>
+
+                {/* Local File Picker (.mp3, .mp4, etc.) */}
+                <label className="btn-secondary" style={{ cursor: 'pointer', textAlign: 'center', padding: '0.5rem' }}>
+                  {isUploadingAudioFile ? 'Uploading File...' : '📁 Upload Audio/Video File (.mp3, .mp4)'}
+                  <input 
+                    type="file" 
+                    accept="audio/*,video/mp4,video/*" 
+                    onChange={handleAudioFileUpload} 
+                    style={{ display: 'none' }} 
+                    disabled={isUploadingAudioFile} 
+                  />
+                </label>
+
+                <div style={{ textAlign: 'center', fontSize: '0.85rem', color: '#6b7280' }}>— OR —</div>
+
+                {/* URL Form */}
+                <form onSubmit={handleAddAudioUrl} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <input
+                    type="text"
+                    placeholder="Clip Label (e.g. Laughing)"
+                    value={audioLabelInput}
+                    onChange={(e) => setAudioLabelInput(e.target.value)}
+                    style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', textAlign: 'left', letterSpacing: 'normal' }}
+                  />
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input
+                      type="url"
+                      placeholder="Paste Audio/Video URL (https://...)"
+                      value={audioUrlInput}
+                      onChange={(e) => setAudioUrlInput(e.target.value)}
+                      style={{ flex: 1, padding: '0.4rem 0.6rem', fontSize: '0.85rem', textAlign: 'left', letterSpacing: 'normal' }}
+                    />
+                    <button type="submit" className="btn-secondary-sm" disabled={!audioUrlInput.trim()}>
+                      Add URL
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
+
             <div className="modal-actions" style={{ marginTop: '1.5rem' }}>
               <button type="button" className="btn-primary" onClick={() => setInspectingCard(null)}>
                 Done
@@ -582,10 +667,10 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
                 style={{ fontSize: '1rem', letterSpacing: 'normal', textAlign: 'left' }}
               />
               {/* File Picker */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label 
-                    htmlFor="photo-upload" 
-                    style={{
+                  htmlFor="photo-upload" 
+                  style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -598,47 +683,47 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
                     fontWeight: '600',
                     fontSize: '0.95rem',
                     textAlign: 'center'
-                    }}
+                  }}
                 >
-                    <svg style={{ width: '20px', height: '20px', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg style={{ width: '20px', height: '20px', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                    {selectedFile ? selectedFile.name : 'Choose Photo File'}
+                  </svg>
+                  {selectedFile ? selectedFile.name : 'Choose Photo File'}
                 </label>
 
                 {/* Hidden native input */}
                 <input 
-                    id="photo-upload" 
-                    type="file" 
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    onChange={(e) => {
+                  id="photo-upload" 
+                  type="file" 
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
                     if (e.target.files?.[0]) setSelectedFile(e.target.files[0]);
-                    }}
+                  }}
                 />
-                </div>
+              </div>
 
-                {/* Divider */}
-                <div style={{ textAlign: 'center', fontSize: '0.85rem', color: '#6b7280', margin: '0.25rem 0' }}>
+              {/* Divider */}
+              <div style={{ textAlign: 'center', fontSize: '0.85rem', color: '#6b7280', margin: '0.25rem 0' }}>
                 — OR —
-                </div>
+              </div>
 
-                {/* Photo URL */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              {/* Photo URL */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                 <input
-                    type="text"
-                    value={newPhotoUrl}
-                    onChange={(e) => setNewPhotoUrl(e.target.value)}
-                    placeholder="Photo URL (disabled if file chosen)"
-                    disabled={!!selectedFile}
-                    style={{ 
+                  type="text"
+                  value={newPhotoUrl}
+                  onChange={(e) => setNewPhotoUrl(e.target.value)}
+                  placeholder="Photo URL (disabled if file chosen)"
+                  disabled={!!selectedFile}
+                  style={{ 
                     fontSize: '1rem', 
                     letterSpacing: 'normal', 
                     textAlign: 'left',
                     opacity: selectedFile ? 0.5 : 1 
-                    }}
+                  }}
                 />
-                </div>
+              </div>
               <div className="modal-actions">
                 <button type="button" className="btn-secondary" onClick={() => setShowAddModal(false)}>
                   Cancel
