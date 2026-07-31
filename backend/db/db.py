@@ -10,7 +10,6 @@ logger = logging.getLogger("Soundboard Logger")
 _client = None
 
 def get_db():
-    """Returns the MongoDB database instance if USE_DB is true, else None."""
     global _client
     
     if os.getenv("USE_DB", "true").lower() != "true":
@@ -19,14 +18,17 @@ def get_db():
         
     if _client is None:
         uri = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-        logger.info(f"[DB] Initializing new MongoClient connection...")
+        logger.info("[DB] Initializing MongoClient connection...")
+        
+        mongo_kwargs = {"serverSelectionTimeoutMS": 10000}
+        
+        # FIX: Explicitly specify tls=True along with certifi
+        if "mongodb+srv" in uri or "ssl=true" in uri.lower():
+            mongo_kwargs["tls"] = True
+            mongo_kwargs["tlsCAFile"] = certifi.where()
+            
         try:
-            # tlsCAFile=certifi.where() injects trusted CA certs to pass SSL handshakes on cloud hosts
-            _client = MongoClient(
-                uri, 
-                tlsCAFile=certifi.where(),
-                serverSelectionTimeoutMS=10000  # 10s timeout instead of hanging 30s
-            )
+            _client = MongoClient(uri, **mongo_kwargs)
             logger.info("[DB] MongoClient instantiated successfully.")
         except Exception as e:
             logger.error(f"[DB ERROR] Failed to instantiate MongoClient: {e}", exc_info=True)

@@ -25,10 +25,9 @@ export const App: React.FC = () => {
 
   const fetchCards = async () => {
     try {
-      const res = await apiFetch('/api/cards');
-      if (res.ok) {
-        const data = await res.json();
-        setCards(data);
+      const data = await apiFetch('/api/cards');
+      if (data) {
+        setCards(data); // Directly set the Array(5) into state!
       }
     } catch (err) {
       console.error('Failed to fetch cards:', err);

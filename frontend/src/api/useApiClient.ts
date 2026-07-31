@@ -1,12 +1,21 @@
 import { useAuth } from '@clerk/clerk-react';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const getApiBaseUrl = () => {
+  // 1. If running locally in development, force localhost/local IP
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '192.168.1.6') {
+    return 'http://192.168.1.6:8000'; // or http://localhost:8000
+  }
+  // 2. Otherwise use your production Render URL
+  return 'https://fsapp-ci88.onrender.com';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export const useApiClient = () => {
   const { getToken } = useAuth();
 
   const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
-    const fullUrl = `${API_BASE_URL}${endpoint}`;
+    const fullUrl = `${API_BASE_URL}${endpoint}` ;
     const method = options.method || 'GET';
 
     console.log(`[API START] Initiating ${method} -> ${fullUrl}`);

@@ -24,9 +24,11 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://192.168.1.6:5173"
     ],
-    # REGEX matches ANY sub-domain ending in .vercel.app (preview builds included!)
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    # REGEX matches ANY local IP address (e.g. 192.168.1.x) OR any .vercel.app domain
+    allow_origin_regex=r"https://.*\.vercel\.app|http://192\.168\.\d+\.\d+(:\d+)?|http://10\.\d+\.\d+\.\d+(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
