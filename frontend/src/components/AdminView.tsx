@@ -152,6 +152,31 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
     }
   };
 
+  const handleDeletePhoto = async (urlToDelete: string) => {
+    if (!activeCard) return;
+    if (currentPhotos.length <= 1) {
+      alert('Cards must keep at least one photo!');
+      return;
+    }
+    if (!confirm('Delete this photo?')) return;
+
+    const updatedUrls = currentPhotos.filter((url) => url !== urlToDelete);
+
+    try {
+      await apiFetch(`/api/cards/${activeCard.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          photo_url: updatedUrls[0] || '',
+          photo_urls: updatedUrls,
+        }),
+      });
+      onRefresh();
+    } catch (err) {
+      alert('Failed to delete photo');
+    }
+  };
+
   // --- 4. CLUES & FACTS MANAGEMENT ---
   const handleAddFact = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -367,33 +392,33 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
 
               <div className="photo-gallery-grid">
                 {currentPhotos.map((url, idx) => (
-                  <div key={idx} className="gallery-item">
+                  <div key={idx} className="gallery-item" style={{ position: 'relative' }}>
                     <img src={url} alt={`Photo ${idx + 1}`} />
+                    <button
+                      type="button"
+                      className="btn-icon-danger"
+                      style={{
+                        position: 'absolute',
+                        top: '4px',
+                        right: '4px',
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '24px',
+                        height: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        fontSize: '12px'
+                      }}
+                      onClick={() => handleDeletePhoto(url)}
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))}
-              </div>
-
-              {/* Add Photo Inputs */}
-              <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <label className="btn-secondary" style={{ cursor: 'pointer', margin: 0, padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}>
-                    {isUploadingPhoto ? 'Uploading...' : '📁 Upload Local File'}
-                    <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} disabled={isUploadingPhoto} />
-                  </label>
-                </div>
-
-                <form onSubmit={handleAddPhotoFromUrl} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
-                  <input
-                    type="url"
-                    placeholder="Or paste image URL (e.g. https://...)"
-                    value={photoUrlInput}
-                    onChange={(e) => setPhotoUrlInput(e.target.value)}
-                    style={{ flex: 1, padding: '0.4rem 0.6rem', fontSize: '0.85rem', textAlign: 'left', letterSpacing: 'normal' }}
-                  />
-                  <button type="submit" className="btn-secondary-sm" disabled={!photoUrlInput.trim()}>
-                    Add Photo
-                  </button>
-                </form>
               </div>
             </div>
 

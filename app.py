@@ -315,25 +315,19 @@ def delete_card(card_id: str, current_user: dict = Depends(get_current_user)):
         logger.error(f"[DELETE CARD ERROR] Attempt to delete card {card_id} failed: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete card")
 
-@app.delete("/api/audio/{audio_id}/audio")
-def delete_audio_clips(audio_id: str):
-    logger.info(f"[DELETE AUDIO CLIP] Request for audio file ID: {audio_id}")
+@app.delete("/api/audio/{clip_id}")
+def delete_audio_clip(clip_id: str, current_user: dict = Depends(get_current_user)):
     db = get_db()
     if db is None:
-        raise HTTPException(status_code=500, detail="Database not found")
-    clip = db.audio_clips.find_one({"_id": ObjectId(audio_id)})
-    if clip is None:
+        raise HTTPException(status_code=500, detail="Database unavailable")
+    
+    # Find and delete the clip document from MongoDB
+    result = db.audio_clips.delete_one({"_id": ObjectId(clip_id)})
+    if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Audio clip not found")
-    file_id = clip["file_id"]
-    fs = gridfs.GridFS(db)
-    try:
-        fs.delete(file_id)
-        db.audio_clips.delete_one({"_id": ObjectId(audio_id)})
-        logger.info(f"[DELETE AUDIO SUCCESS] Audio clip {file_id} deleted.")
-        return {"status": "success", "message": "Audio clip deleted"}
-    except Exception as e:
-        logger.error(f"[DELETE AUDIO ERROR] Failed to delete {file_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete audio clip")
+        
+    logger.info(f"[DELETE AUDIO SUCCESS] Deleted clip: {clip_id}")
+    return {"success": True}
 
 @app.delete("/api/cards/{card_id}/audio")
 def bulk_delete_audio(card_id: str, payload: BulkAudioDelete):
