@@ -98,6 +98,19 @@ def get_sound_cards(current_user: dict = Depends(get_current_user)):
         card["id"] = str(card["_id"])
         del card["_id"]
         
+        # Fetch and attach associated audio clips for this card
+        clips = list(db.audio_clips.find({"card_id": ObjectId(card["id"])}))
+        audio_clips = []
+        for clip in clips:
+            audio_clips.append({
+                "id": str(clip["_id"]),
+                "card_id": str(clip["card_id"]),
+                "label": clip.get("label", "Voice Clip"),
+                "is_daily_postcard": clip.get("is_daily_postcard", False),
+                "audio_url": f"/api/audio/{str(clip['file_id'])}"
+            })
+        card["audio_clips"] = audio_clips
+        
     logger.info(f"[GET CARDS SUCCESS] Retrieved {len(cards)} cards for user {user_id}")
     return cards
 

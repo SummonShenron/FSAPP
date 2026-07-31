@@ -302,7 +302,7 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
     ? activeCard.audio_clips
     : (activeCard?.audio_urls || (activeCard?.audio_url ? [activeCard.audio_url] : [])).map((url, idx) => ({
         id: `clip-${idx}`,
-        url: url,
+        audio_url: url,
         label: `Voice Clip ${idx + 1}`
       }));
 
@@ -459,7 +459,17 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
                 <div className="audio-clips-list">
                   {currentAudioClips.map((clip, idx) => (
                     <div key={clip.id || idx} className="audio-clip-row">
-                      <button type="button" className="clip-play-btn" onClick={() => new Audio(clip.url).play()}>
+                      <button 
+                        type="button" 
+                        className="clip-play-btn" 
+                        onClick={() => {
+                          const audioPath = (clip as any).audio_url || (clip as any).url;
+                          const fullUrl = audioPath?.startsWith('http') 
+                            ? audioPath 
+                            : `http://192.168.1.6:8000${audioPath}`;
+                          new Audio(fullUrl).play();
+                        }}
+                      >
                         ▶️
                       </button>
                       <div className="clip-info">

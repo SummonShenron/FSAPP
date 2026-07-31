@@ -194,10 +194,21 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
   }, [cards]);
 
   const handlePlaySound = () => {
-    if (!targetCard || !targetCard.audio_url) return;
+    if (!targetCard) return;
+
+    const clips = (targetCard as any).audio_clips || [];
+    const audioPath = clips.length > 0 
+      ? clips[Math.floor(Math.random() * clips.length)].audio_url 
+      : (targetCard as any).audio_url;
+
+    if (!audioPath) return;
 
     setIsKnocking(true);
-    const audio = playModifiedAudio(targetCard.audio_url, activeFilter);
+    const fullAudioUrl = audioPath.startsWith('http') 
+      ? audioPath 
+      : `http://192.168.1.6:8000${audioPath}`;
+
+    const audio = playModifiedAudio(fullAudioUrl, activeFilter);
 
     if (audio) {
       audio.onended = () => setIsKnocking(false);
@@ -212,8 +223,14 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
     setIsKnocking(false);
     const isCorrect = card.id === targetCard?.id;
     submitGuess(isCorrect);
+    
     if (isCorrect) {
-      playModifiedAudio(card.audio_url, 'normal');
+      const clips = (card as any).audio_clips || [];
+      const audioPath = clips.length > 0 ? clips[0].audio_url : (card as any).audio_url;
+      if (audioPath) {
+        const fullUrl = audioPath.startsWith('http') ? audioPath : `http://192.168.1.6:8000${audioPath}`;
+        playModifiedAudio(fullUrl, 'normal');
+      }
       const reward = STICKERS[Math.floor(Math.random() * STICKERS.length)];
       setWonSticker(reward);
       onRewardSticker(card.id, reward);
