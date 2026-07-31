@@ -7,10 +7,11 @@ import { StickerAlbum } from './src/components/StickerAlbumView';
 import { useGameEngine } from './src/api/useGameEngine'; 
 import { SignedIn, SignedOut, SignIn, UserButton } from '@clerk/clerk-react';
 import { useApiClient } from './src/api/useApiClient'; // If this is inside src/api/, change to './src/api/useApiClient'
-import './index.css'; // If index.css is inside src/, change to './src/index.css'
+import './index.css';
+import { StickerCanvas } from './src/components/StickerCanvasView'
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'GAME' | 'ALBUM'>('GAME');
+  const [activeTab, setActiveTab] = useState<'GAME' | 'ALBUM' | 'CANVAS'>('GAME');
   const { apiFetch } = useApiClient();
   const [cards, setCards] = useState<SoundCard[]>([]);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
@@ -97,6 +98,21 @@ export const App: React.FC = () => {
               >
                 📖 Sticker Book ({inventory.length})
               </button>
+              <button
+                onClick={() => setActiveTab('CANVAS')}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  backgroundColor: activeTab === 'CANVAS' ? '#ffffff' : 'transparent',
+                  boxShadow: activeTab === 'CANVAS' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  color: activeTab === 'CANVAS' ? '#1f2937' : '#6b7280'
+                }}
+              >
+                🎨 Doodle Board
+              </button>
             </div>
           )}
 
@@ -120,7 +136,7 @@ export const App: React.FC = () => {
             />
           ) : (
             <>
-              <div style={{ display: activeTab === 'GAME' ? 'block' : 'none' }}>
+              {activeTab === 'GAME' && (
                 <KnockGame 
                   cards={cards}
                   engine={gameEngine} 
@@ -128,8 +144,7 @@ export const App: React.FC = () => {
                     console.log('Reward earned:', cardId, sticker);
                   }}
                 />
-              </div>
-
+              )}
               {activeTab === 'ALBUM' && (
                 <StickerAlbum 
                   inventory={inventory} 
@@ -141,6 +156,12 @@ export const App: React.FC = () => {
                     setCardDecorations({});
                     resetAllProgress();
                   }}
+                />
+              )}  
+              {activeTab === 'CANVAS' && (
+                <StickerCanvas 
+                  inventory={inventory} 
+                  onBackToGame={() => setActiveTab('GAME')} 
                 />
               )}
             </>
