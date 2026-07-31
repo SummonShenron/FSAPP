@@ -44,22 +44,18 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/admin/verify', {
+        // apiFetch automatically prepends your Render backend URL
+        await apiFetch('/api/admin/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin: pinInput }),
-      });
+        });
 
-      if (res.ok) {
         setIsUnlocked(true);
         setPinError(null);
-      } else {
-        setPinError('Incorrect PIN');
-      }
     } catch (err) {
-      setPinError('Error connecting to backend');
+        setPinError('Incorrect PIN');
     }
-  };
+    };
 
   // --- 2. CARD MANAGEMENT ---
   const handleCreateCard = async (e: React.FormEvent) => {
