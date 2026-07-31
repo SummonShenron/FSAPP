@@ -72,6 +72,7 @@ header {
   background-color: rgba(255, 255, 255, 0.9);
   border-bottom: 3px solid var(--border-color);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
 }
 
 /* ==========================================================================
@@ -89,7 +90,7 @@ header {
   font-size: 1.05rem;
   border-radius: 18px;
   cursor: pointer;
-  transition: all 0.1s ease;
+  transition: all 0.2s ease;
   user-select: none;
   display: inline-flex;
   align-items: center;
