@@ -12,6 +12,7 @@ interface Props {
 export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
   // Authentication State
   const { apiFetch } = useApiClient();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
@@ -62,32 +63,42 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
 
   // --- 2. CARD MANAGEMENT ---
   const handleCreateCard = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await apiFetch('/api/cards', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newTitle,
-          relation: newRelation,
-          photo_url: newPhotoUrl || 'https://via.placeholder.com/150',
-          photo_urls: newPhotoUrl ? [newPhotoUrl] : [],
-          bg_color: '#ffffff',
-          fact: newFact || '',
-          facts: newFact ? [newFact] : [],
-        }),
-      });
+  e.preventDefault();
 
-      setShowAddModal(false);
-      setNewTitle('');
-      setNewRelation('');
-      setNewPhotoUrl('');
-      setNewFact('');
-      onRefresh();
-    } catch (err) {
-      alert('Failed to create card');
+  try {
+    const formData = new FormData();
+    formData.append('title', newTitle);
+    formData.append('relation', newRelation || '');
+    formData.append('bg_color', '#ffffff');
+    formData.append('fact', newFact || '');
+
+    // If a physical file was picked, attach it
+    if (selectedFile) {
+      formData.append('file', selectedFile);
+    } else {
+      // Otherwise fallback to the URL or default placeholder
+      formData.append('photo_url', newPhotoUrl || 'https://via.placeholder.com/150');
     }
-  };
+
+    await apiFetch('/api/cards', {
+      method: 'POST',
+      // CRITICAL: Do NOT include 'Content-Type': 'application/json'!
+      // Leaving headers blank (or omitting Content-Type) allows the browser 
+      // to automatically set 'multipart/form-data' with the correct boundary.
+      body: formData,
+    });
+
+    setShowAddModal(false);
+    setNewTitle('');
+    setNewRelation('');
+    setNewPhotoUrl('');
+    setNewFact('');
+    setSelectedFile(null); // Reset file selection
+    onRefresh();
+  } catch (err) {
+    alert('Failed to create card');
+  }
+};
 
   const handleDeleteCard = async (cardId: string) => {
     if (!confirm('Are you sure you want to delete this person?')) return;
@@ -516,13 +527,64 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
                 onChange={(e) => setNewFact(e.target.value)}
                 style={{ fontSize: '1rem', letterSpacing: 'normal', textAlign: 'left' }}
               />
-              <input
-                type="url"
-                placeholder="Photo URL (optional)"
-                value={newPhotoUrl}
-                onChange={(e) => setNewPhotoUrl(e.target.value)}
-                style={{ fontSize: '1rem', letterSpacing: 'normal', textAlign: 'left' }}
-              />
+              {/* File Picker */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label 
+                    htmlFor="photo-upload" 
+                    style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    backgroundColor: '#2563eb',
+                    color: '#ffffff',
+                    padding: '0.6rem 1rem',
+                    borderRadius: '0.5rem',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    fontSize: '0.95rem',
+                    textAlign: 'center'
+                    }}
+                >
+                    <svg style={{ width: '20px', height: '20px', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    {selectedFile ? selectedFile.name : 'Choose Photo File'}
+                </label>
+
+                {/* Hidden native input */}
+                <input 
+                    id="photo-upload" 
+                    type="file" 
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                    if (e.target.files?.[0]) setSelectedFile(e.target.files[0]);
+                    }}
+                />
+                </div>
+
+                {/* Divider */}
+                <div style={{ textAlign: 'center', fontSize: '0.85rem', color: '#6b7280', margin: '0.25rem 0' }}>
+                — OR —
+                </div>
+
+                {/* Photo URL */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <input
+                    type="text"
+                    value={newPhotoUrl}
+                    onChange={(e) => setNewPhotoUrl(e.target.value)}
+                    placeholder="Photo URL (disabled if file chosen)"
+                    disabled={!!selectedFile}
+                    style={{ 
+                    fontSize: '1rem', 
+                    letterSpacing: 'normal', 
+                    textAlign: 'left',
+                    opacity: selectedFile ? 0.5 : 1 
+                    }}
+                />
+                </div>
               <div className="modal-actions">
                 <button type="button" className="btn-secondary" onClick={() => setShowAddModal(false)}>
                   Cancel
