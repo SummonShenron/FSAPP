@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, status, Depends
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, status, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -18,13 +18,15 @@ load_dotenv()
 logger = setup_logging()
 app = FastAPI(title="Family Soundboard API")
 pin = os.getenv("ADMIN_PIN")
+# --- 2. Dynamic CORS Middleware ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://fsapp-nu.vercel.app",  # Your production Vercel app
-        "http://localhost:5173",         # Local Vite dev server
+        "http://localhost:5173",
         "http://localhost:3000",
     ],
+    # REGEX matches ANY sub-domain ending in .vercel.app (preview builds included!)
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -67,6 +69,18 @@ class SoundCardUpdate(BaseModel):
 
 class BeautifyRequest(BaseModel):
     image_base64: str
+
+# --- 1. Request Logging Middleware ---
+@app.middleware("http")
+async def log_incoming_requests(request: Request, call_next):
+    logger.info(f"================== INCOMING REQUEST ==================")
+    logger.info(f"Method & Path: {request.method} {request.url.path}")
+    logger.info(f"Origin Header: {request.headers.get('origin', 'No Origin Header')}")
+    logger.info(f"Auth Header: {'Present' if 'authorization' in request.headers else 'Missing'}")
+    response = await call_next(request)
+    logger.info(f"Response Status: {response.status_code}")
+    logger.info(f"======================================================")
+    return response
 
 @app.get("/api/cards")
 def get_sound_cards(current_user: dict = Depends(get_current_user)):

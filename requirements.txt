@@ -9,3 +9,4 @@ Requests
 cryptography
 google-genai
 pillow
+certifi
