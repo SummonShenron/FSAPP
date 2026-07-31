@@ -18,7 +18,8 @@ load_dotenv()
 logger = setup_logging()
 app = FastAPI(title="Family Soundboard API")
 pin = os.getenv("ADMIN_PIN")
-# --- 2. Dynamic CORS Middleware ---
+
+# --- Dynamic CORS Middleware ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -27,7 +28,6 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://192.168.1.6:5173"
     ],
-    # REGEX matches ANY local IP address (e.g. 192.168.1.x) OR any .vercel.app domain
     allow_origin_regex=r"https://.*\.vercel\.app|http://192\.168\.\d+\.\d+(:\d+)?|http://10\.\d+\.\d+\.\d+(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
@@ -36,17 +36,17 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup():
+    logger.info("[STARTUP] Testing database connection on app startup...")
     test_connection()
 
 # --- Pydantic Schemas ---
 class SoundCardCreate(BaseModel):
-    title: str               # e.g., "Auntie Sarah"
-    relation: str            # e.g., "Auntie"
-    photo_url: str           # Public image link or base64 string
-    bg_color: Optional[str] = "#dbeafe" # Default soft blue
-    fact: Optional[str] = ""            # 🕵️ Single active clue
-    facts: Optional[List[str]] = []     # 🕵️ List of all clues
-
+    title: str               
+    relation: str            
+    photo_url: str           
+    bg_color: Optional[str] = "#dbeafe" 
+    fact: Optional[str] = ""            
+    facts: Optional[List[str]] = []     
 
 class BulkPhotoDelete(BaseModel):
     photo_ids: List[str]
@@ -66,36 +66,39 @@ class SoundCardUpdate(BaseModel):
     bg_color: Optional[str] = None
     photo_urls: Optional[List[str]] = None
     photo_url: Optional[str] = None
-    fact: Optional[str] = ""            # 🕵️ Single active clue
-    facts: Optional[List[str]] = []     # 🕵️ List of all clues
+    fact: Optional[str] = ""            
+    facts: Optional[List[str]] = []     
 
 class BeautifyRequest(BaseModel):
     image_base64: str
 
-# --- 1. Request Logging Middleware ---
+# --- Request Logging Middleware ---
 @app.middleware("http")
 async def log_incoming_requests(request: Request, call_next):
-    logger.info(f"================== INCOMING REQUEST ==================")
+    logger.info("================== INCOMING REQUEST ==================")
     logger.info(f"Method & Path: {request.method} {request.url.path}")
     logger.info(f"Origin Header: {request.headers.get('origin', 'No Origin Header')}")
     logger.info(f"Auth Header: {'Present' if 'authorization' in request.headers else 'Missing'}")
     response = await call_next(request)
     logger.info(f"Response Status: {response.status_code}")
-    logger.info(f"======================================================")
+    logger.info("======================================================")
     return response
 
 @app.get("/api/cards")
 def get_sound_cards(current_user: dict = Depends(get_current_user)):
-    user_id = current_user["sub"]  # Unique Clerk ID (e.g., 'user_2pX...')
+    user_id = current_user["sub"]
+    logger.info(f"[GET CARDS] Fetching cards for user: {user_id}")
     db = get_db()
     if db is None:
+        logger.error("[GET CARDS ERROR] Database disabled or unavailable.")
         return []
-    # Scoped strictly to the logged-in user
+        
     cards = list(db.sound_cards.find({"user_id": user_id}).sort("order", 1))
     for card in cards:
         card["id"] = str(card["_id"])
         del card["_id"]
-    logger.info(f"Retrieved cards for user {current_user['sub']}")
+        
+    logger.info(f"[GET CARDS SUCCESS] Retrieved {len(cards)} cards for user {user_id}")
     return cards
 
 @app.post("/api/cards")
@@ -108,15 +111,19 @@ async def create_sound_card(
     file: Optional[UploadFile] = File(None),
     current_user: dict = Depends(get_current_user)
 ):
+    user_id = current_user["sub"]
+    logger.info(f"[CREATE CARD] Request received from user {user_id} | Title: '{title}', Relation: '{relation}', BG: '{bg_color}'")
+    
     db = get_db()
     if db is None:
+        logger.error("[CREATE CARD ERROR] Database disabled")
         raise HTTPException(status_code=500, detail="Database disabled")
 
     try:
         final_photo_url = photo_url
 
-        # 1. If an image file was uploaded, stream it straight into GridFS
         if file and file.filename:
+            logger.info(f"[CREATE CARD] Processing uploaded file: {file.filename} ({file.content_type})")
             fs = gridfs.GridFS(db)
             file_id = fs.put(
                 await file.read(),
@@ -124,11 +131,12 @@ async def create_sound_card(
                 content_type=file.content_type
             )
             final_photo_url = f"/api/photo/{str(file_id)}"
+            logger.info(f"[CREATE CARD] File successfully stored in GridFS with ID: {file_id}")
 
         if not final_photo_url:
+            logger.warning("[CREATE CARD WARNING] Failed validation: No photo URL or file provided.")
             raise HTTPException(status_code=400, detail="Must provide either a photo URL or upload an image file")
 
-        # 2. Build the MongoDB document
         new_card = {
             "title": title,
             "relation": relation,
@@ -137,35 +145,36 @@ async def create_sound_card(
             "bg_color": bg_color,
             "fact": fact,
             "facts": [fact] if fact else [],
-            "user_id": current_user["sub"],
+            "user_id": user_id,
             "audio_url": None
         }
 
-        # 3. Save to MongoDB sound_cards collection
         result = db.sound_cards.insert_one(new_card) 
         new_card["id"] = str(result.inserted_id)
         del new_card["_id"]
 
-        logger.info(f"Created card {new_card['id']} with GridFS image for user {current_user['sub']}")
+        logger.info(f"[CREATE CARD SUCCESS] Successfully inserted card ID {new_card['id']} into MongoDB for user {user_id}")
         return new_card
 
     except HTTPException as he:
         raise he
     except Exception as e:
-        logger.error(f"Failed to create new card: {e}")
+        logger.error(f"[CREATE CARD EXCEPTION] Failed to create new card: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to create card")
 
 @app.post("/api/cards/reorder")
-def reorder_cards(payload: CardOrderUpdate):
+def reorder_cards(payload: CardOrderUpdate, current_user: dict = Depends(get_current_user)):
+    logger.info(f"[REORDER CARDS] Request received from user {current_user['sub']} with {len(payload.card_ids)} card IDs.")
     db = get_db()
     if db is None:
         raise HTTPException(status_code=500, detail="Database disabled")
+        
     for index, card_id in enumerate(payload.card_ids):
         db.sound_cards.update_one(
             {"_id": ObjectId(card_id)},
             {"$set": {"order": index}}
         )
-    
+    logger.info("[REORDER CARDS SUCCESS] Cards reordered successfully.")
     return {"status": "success"}
 
 @app.post("/api/cards/{card_id}/audio")
@@ -173,11 +182,14 @@ async def upload_audio_clip(
     card_id: str,
     label: str = Form(""),
     is_daily_postcard: bool = Form(False),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
 ):
+    logger.info(f"[UPLOAD AUDIO] Request for card {card_id}, label: '{label}', filename: {file.filename}")
     db = get_db()
     if db is None:
         raise HTTPException(status_code=500, detail="Database disabled")
+        
     fs = gridfs.GridFS(db)
     file_id = fs.put(await file.read(), filename=file.filename, content_type=file.content_type)
     audio_doc = {
@@ -187,12 +199,12 @@ async def upload_audio_clip(
         "is_daily_postcard": is_daily_postcard,
     }
     result = db.audio_clips.insert_one(audio_doc)
-    # NEW: Update the parent sound card's active audio_url
     audio_url = f"/api/audio/{str(file_id)}"
     db.sound_cards.update_one(
         {"_id": ObjectId(card_id)},
         {"$set": {"audio_url": audio_url}}
     )
+    logger.info(f"[UPLOAD AUDIO SUCCESS] Audio clip {result.inserted_id} saved and linked to card {card_id}")
     return {
         "id": str(result.inserted_id),
         "card_id": card_id,
@@ -203,6 +215,7 @@ async def upload_audio_clip(
 
 @app.get("/api/cards/{card_id}/audio")
 def list_audio_clips(card_id: str):
+    logger.info(f"[LIST AUDIO] Fetching audio clips for card {card_id}")
     db = get_db()
     if db is None:
         raise HTTPException(status_code=500, detail="Database disabled")
@@ -212,15 +225,22 @@ def list_audio_clips(card_id: str):
         clip["file_id"] = str(clip["file_id"])
         del clip["_id"]
         clip["audio_url"] = f"/api/audio/{clip['file_id']}"
+    logger.info(f"[LIST AUDIO SUCCESS] Found {len(clips)} audio clips for card {card_id}")
     return clips
 
 @app.patch("/api/cards/{card_id}")
-def update_card(card_id: str, payload: SoundCardUpdate):
+def update_card(card_id: str, payload: SoundCardUpdate, current_user: dict = Depends(get_current_user)):
+    logger.info(f"[UPDATE CARD] Request received for card {card_id} by user {current_user['sub']}")
+    logger.info(f"[UPDATE CARD PAYLOAD] {payload.dict(exclude_unset=True)}")
+    
     db = get_db()
     if db is None:
+        logger.error("[UPDATE CARD ERROR] Database disabled")
         raise HTTPException(status_code=500, detail="Database disabled")
+        
     card = db.sound_cards.find_one({"_id": ObjectId(card_id)})
     if card is None:
+        logger.warning(f"[UPDATE CARD WARNING] Card {card_id} not found in database.")
         raise HTTPException(status_code=404, detail="Card not found")
         
     update_data = {}
@@ -234,25 +254,30 @@ def update_card(card_id: str, payload: SoundCardUpdate):
         update_data["photo_url"] = payload.photo_url
     if payload.photo_urls is not None:
         update_data["photo_urls"] = payload.photo_urls
-    # 🕵️ Pass fact and facts to MongoDB update object
     if payload.fact is not None:
         update_data["fact"] = payload.fact
     if payload.facts is not None:
         update_data["facts"] = payload.facts
+        
     if update_data:
+        logger.info(f"[UPDATE CARD] Applying changes to card {card_id}: {list(update_data.keys())}")
         db.sound_cards.update_one(
             {"_id": ObjectId(card_id)},
             {"$set": update_data}
         )
+    else:
+        logger.info(f"[UPDATE CARD] No fields provided to modify for card {card_id}.")
+        
     updated = db.sound_cards.find_one({"_id": ObjectId(card_id)})
     updated["id"] = str(updated["_id"])
     del updated["_id"]
-    return updated
     
-
+    logger.info(f"[UPDATE CARD SUCCESS] Card {card_id} updated successfully.")
+    return updated
 
 @app.delete("/api/cards/{card_id}")
-def delete_card(card_id: str):
+def delete_card(card_id: str, current_user: dict = Depends(get_current_user)):
+    logger.info(f"[DELETE CARD] Request to delete card {card_id} by user {current_user['sub']}")
     db = get_db()
     if db is None:
         raise HTTPException(status_code=500, detail="Database disabled")
@@ -260,6 +285,7 @@ def delete_card(card_id: str):
         card = db.sound_cards.find_one({"_id": ObjectId(card_id)})
         if card is None:
             raise HTTPException(status_code=404, detail="Card not found")
+            
         clips = list(db.audio_clips.find({"card_id": ObjectId(card_id)}))
         fs = gridfs.GridFS(db)
         for clip in clips:
@@ -267,16 +293,18 @@ def delete_card(card_id: str):
                 fs.delete(clip["file_id"])
             except Exception as e:
                 logger.error(f"Failed to delete GridFS file {clip['file_id']}: {e}")
+                
         db.audio_clips.delete_many({"card_id": ObjectId(card_id)})
         db.sound_cards.delete_one({"_id": ObjectId(card_id)})
-        logger.info(f"Card {card_id} and all audio clips deleted successfully!")
+        logger.info(f"[DELETE CARD SUCCESS] Card {card_id} and associated audio clips deleted.")
         return {"status": "success", "message": "Card and all audio clips deleted"}
     except Exception as e:
-        logger.error(f"Attempt to delete card {card_id} was unsuccessful: {e}")
+        logger.error(f"[DELETE CARD ERROR] Attempt to delete card {card_id} failed: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete card")
 
 @app.delete("/api/audio/{audio_id}/audio")
 def delete_audio_clips(audio_id: str):
+    logger.info(f"[DELETE AUDIO CLIP] Request for audio file ID: {audio_id}")
     db = get_db()
     if db is None:
         raise HTTPException(status_code=500, detail="Database not found")
@@ -288,15 +316,15 @@ def delete_audio_clips(audio_id: str):
     try:
         fs.delete(file_id)
         db.audio_clips.delete_one({"_id": ObjectId(audio_id)})
-        logger.info(f"{file_id} deleted successfully!")
+        logger.info(f"[DELETE AUDIO SUCCESS] Audio clip {file_id} deleted.")
         return {"status": "success", "message": "Audio clip deleted"}
     except Exception as e:
-        logger.error(f"failed to delete {file_id}") 
-        logger.error(f"Failed to delete {file_id}: {e}")
+        logger.error(f"[DELETE AUDIO ERROR] Failed to delete {file_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete audio clip")
 
 @app.delete("/api/cards/{card_id}/audio")
 def bulk_delete_audio(card_id: str, payload: BulkAudioDelete):
+    logger.info(f"[BULK DELETE AUDIO] Request for card {card_id} with {len(payload.audio_ids)} clips.")
     db = get_db()
     if db is None:
         raise HTTPException(status_code=500, detail="Database disabled")
@@ -307,32 +335,34 @@ def bulk_delete_audio(card_id: str, payload: BulkAudioDelete):
     for audio_id in payload.audio_ids:
         clip = db.audio_clips.find_one({"_id": ObjectId(audio_id)})
         if clip is None:
-            logger.warning(f"Audio clip {audio_id} not found for card {card_id}")
+            logger.warning(f"[BULK DELETE AUDIO WARNING] Audio clip {audio_id} not found for card {card_id}")
             continue
-        # Delete GridFS file
         try:
             fs.delete(clip["file_id"])
         except Exception as e:
-            logger.error(f"Failed to delete GridFS file {clip['file_id']}: {e}")
+            logger.error(f"[BULK DELETE AUDIO ERROR] Failed to delete GridFS file {clip['file_id']}: {e}")
             continue
-        # Delete audio clip document
         db.audio_clips.delete_one({"_id": ObjectId(audio_id)})
+        
     updated_clips = list(db.audio_clips.find({"card_id": ObjectId(card_id)}))
     for clip in updated_clips:
         clip["id"] = str(clip["_id"])
         clip["file_id"] = str(clip["file_id"])
         clip["audio_url"] = f"/api/audio/{clip['file_id']}"
         del clip["_id"]
+    logger.info(f"[BULK DELETE AUDIO SUCCESS] Completed for card {card_id}")
     return updated_clips
     
 @app.post("/api/cards/{card_id}/photos")
-async def upload_photo(card_id: str, file: UploadFile = File(...)):
+async def upload_photo(card_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    logger.info(f"[UPLOAD PHOTO] Request for card {card_id}, filename: {file.filename}")
     db = get_db()
     if db is None:
         raise HTTPException(status_code=500, detail="Database disabled")
     card = db.sound_cards.find_one({"_id": ObjectId(card_id)})
     if card is None:
         raise HTTPException(status_code=404, detail="Card not found")
+        
     fs = gridfs.GridFS(db)
     file_id = fs.put(
         await file.read(),
@@ -344,48 +374,51 @@ async def upload_photo(card_id: str, file: UploadFile = File(...)):
         {"_id": ObjectId(card_id)},
         {
             "$push": {"photo_urls": photo_url},
-            "$set": {"photo_url": photo_url}  # <-- Sets newly uploaded picture as primary photo
+            "$set": {"photo_url": photo_url}  
         }
     )
     updated = db.sound_cards.find_one({"_id": ObjectId(card_id)})
     updated["id"] = str(updated["_id"])
     del updated["_id"]
+    logger.info(f"[UPLOAD PHOTO SUCCESS] New photo added to card {card_id}")
     return updated
 
 @app.delete("/api/cards/{card_id}/photos/{photo_id}")
 def delete_photo(card_id: str, photo_id: str):
+    logger.info(f"[DELETE PHOTO] Request to delete photo {photo_id} from card {card_id}")
     db = get_db()
     if db is None:
         raise HTTPException(status_code=500, detail="Database disabled")
-    # Find the card
+        
     card = db.sound_cards.find_one({"_id": ObjectId(card_id)})
     if card is None:
         raise HTTPException(status_code=404, detail="Card not found")
-    # Build the photo URL we expect to remove
+        
     photo_url = f"/api/photo/{photo_id}"
-    # Check if the photo exists in the card
     if photo_url not in card.get("photo_urls", []):
         raise HTTPException(status_code=404, detail="Photo not found in card")
-    # Delete the GridFS file
+        
     fs = gridfs.GridFS(db)
     try:
         fs.delete(ObjectId(photo_id))
     except Exception as e:
-        logger.error(f"Failed to delete GridFS file {photo_id}: {e}")
+        logger.error(f"[DELETE PHOTO ERROR] Failed to delete GridFS file {photo_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete photo file")
-    # Remove the photo URL from the card
+        
     db.sound_cards.update_one(
         {"_id": ObjectId(card_id)},
         {"$pull": {"photo_urls": photo_url}}
     )
-    # Return updated card
+    
     updated = db.sound_cards.find_one({"_id": ObjectId(card_id)})
     updated["id"] = str(updated["_id"])
     del updated["_id"]
+    logger.info(f"[DELETE PHOTO SUCCESS] Photo {photo_id} removed from card {card_id}")
     return updated
 
 @app.delete("/api/cards/{card_id}/photos")
 def bulk_delete_photos(card_id: str, payload: BulkPhotoDelete):
+    logger.info(f"[BULK DELETE PHOTOS] Request for card {card_id} with {len(payload.photo_ids)} IDs.")
     db = get_db()
     if db is None:
         raise HTTPException(status_code=500, detail="Database disabled")
@@ -396,15 +429,13 @@ def bulk_delete_photos(card_id: str, payload: BulkPhotoDelete):
     for photo_id in payload.photo_ids:
         photo_url = f"/api/photo/{photo_id}"
         if photo_url not in card.get("photo_urls", []):
-            logger.warning(f"Photo {photo_id} not found in card {card_id}")
+            logger.warning(f"[BULK DELETE PHOTOS WARNING] Photo {photo_id} not found in card {card_id}")
             continue
-        # Delete GridFS file
         try:
             fs.delete(ObjectId(photo_id))
         except Exception as e:
-            logger.error(f"Failed to delete GridFS file {photo_id}: {e}")
+            logger.error(f"[BULK DELETE PHOTOS ERROR] Failed to delete GridFS file {photo_id}: {e}")
             continue
-        # Remove from photo_urls
         db.sound_cards.update_one(
             {"_id": ObjectId(card_id)},
             {"$pull": {"photo_urls": photo_url}}
@@ -412,16 +443,19 @@ def bulk_delete_photos(card_id: str, payload: BulkPhotoDelete):
     updated = db.sound_cards.find_one({"_id": ObjectId(card_id)})
     updated["id"] = str(updated["_id"])
     del updated["_id"]
+    logger.info(f"[BULK DELETE PHOTOS SUCCESS] Completed for card {card_id}")
     return updated
                         
 @app.post("/api/admin/verify")
 async def verify_admin(payload: PinVerification):
     expected_pin = os.getenv("ADMIN_PIN", "1234")
     if payload.pin != expected_pin:
+        logger.warning("[ADMIN VERIFY] Failed PIN attempt.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect PIN"
         )
+    logger.info("[ADMIN VERIFY SUCCESS] PIN verified successfully.")
     return {"success": True, "message": "Admin access granted"}
 
 @app.get("/api/audio/{file_id}")
@@ -457,18 +491,14 @@ def get_photo_file(file_id: str):
 @app.post("/api/beautify")
 async def beautify_drawing(payload: BeautifyRequest):
     try:
-        # Strip data header if present
         raw_b64 = payload.image_base64
         if "," in raw_b64:
             raw_b64 = raw_b64.split(",")[1]
             
         image_bytes = base64.b64decode(raw_b64)
-        
-        # Call model service
         result_url = genai_service.beautify_sketch(image_bytes)
-        
+        logger.info("[BEAUTIFY SUCCESS] Sketch successfully beautified.")
         return {"resultUrl": result_url}
-
     except Exception as e:
-        logger.error(f"Failed to beautify drawing: {e}")
+        logger.error(f"[BEAUTIFY ERROR] Failed to beautify drawing: {e}")
         raise HTTPException(status_code=500, detail="Failed to beautify drawing")

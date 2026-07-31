@@ -99,7 +99,7 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
   const handleDeleteCard = async (cardId: string) => {
     if (!confirm('Are you sure you want to delete this person?')) return;
     try {
-      await fetch(`/api/cards/${cardId}`, { method: 'DELETE' });
+      await apiFetch(`/api/cards/${cardId}`, { method: 'DELETE' });
       setInspectingCard(null);
       onRefresh();
     } catch (err) {
@@ -116,7 +116,7 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
 
     setIsUploadingPhoto(true);
     try {
-      await fetch(`/api/cards/${activeCard.id}/photos`, {
+        await apiFetch(`/api/cards/${activeCard.id}/photos`, {
         method: 'POST',
         body: formData,
       });
@@ -137,7 +137,7 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
     const updatedUrls = existingUrls.includes(url) ? existingUrls : [...existingUrls, url];
 
     try {
-      await fetch(`/api/cards/${activeCard.id}`, {
+      await apiFetch(`/api/cards/${activeCard.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -162,7 +162,7 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
     const updatedFacts = [...existingFacts, text];
 
     try {
-      await fetch(`/api/cards/${activeCard.id}`, {
+      await apiFetch(`/api/cards/${activeCard.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -183,7 +183,7 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
     const updatedFacts = existingFacts.filter((_, idx) => idx !== indexToDelete);
 
     try {
-      await fetch(`/api/cards/${activeCard.id}`, {
+      await apiFetch(`/api/cards/${activeCard.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -201,7 +201,7 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
   const handleDeleteAudioClip = async (clipId: string) => {
     if (!confirm('Delete this voice clip?')) return;
     try {
-      await fetch(`/api/audio/${clipId}`, { method: 'DELETE' });
+      await apiFetch(`/api/audio/${clipId}`, { method: 'DELETE' });
       onRefresh();
     } catch (err) {
       alert('Failed to delete clip');
@@ -222,7 +222,7 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
         const formData = new FormData();
         formData.append('file', audioBlob, `clip_${activeCard.id}.webm`);
 
-        await fetch(`/api/cards/${activeCard.id}/audio`, {
+        await apiFetch(`/api/cards/${activeCard.id}/audio`, {
           method: 'POST',
           body: formData,
         });
