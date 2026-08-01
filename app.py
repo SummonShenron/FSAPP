@@ -20,15 +20,25 @@ app = FastAPI(title="Family Soundboard API")
 pin = os.getenv("ADMIN_PIN")
 
 # --- Dynamic CORS Middleware ---
+origins = [
+    # Custom Domain
+    "https://familysoundboard.com",
+    "https://www.familysoundboard.com",
+
+    # Vercel Deployments & Previews
+    "https://fsapp-git-main-jackharper0517-6113s-projects.vercel.app",
+    
+    # Local Development
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://192.168.1.6:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-        "http://192.168.1.6:5173"
-    ],
-    allow_origin_regex=r"https://.*\.vercel\.app|http://192\.168\.\d+\.\d+(:\d+)?|http://10\.\d+\.\d+\.\d+(:\d+)?",
+    allow_origins=origins,
+    # If you want to dynamically allow all Vercel preview deployments (*.vercel.app), use regex:
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -225,6 +235,36 @@ async def upload_audio_clip(
         "is_daily_postcard": is_daily_postcard,
         "audio_url": audio_url,
     }
+
+@app.post("/api/cards/{card_id}/audio-url")
+def add_audio_url(
+    card_id: str,
+    data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    db = get_db()
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database unavailable")
+    
+    card = db.sound_cards.find_one({"_id": ObjectId(card_id)})
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found")
+        
+    url = data.get("url")
+    label = data.get("label", "Voice Clip")
+    if not url:
+        raise HTTPException(status_code=400, detail="URL is required")
+        
+    clip_doc = {
+        "card_id": ObjectId(card_id),
+        "label": label,
+        "audio_url": url,
+        "is_daily_postcard": False
+    }
+    db.audio_clips.insert_one(clip_doc)
+    
+    logger.info(f"[ADD AUDIO URL SUCCESS] Added external audio URL to card {card_id}")
+    return {"success": True}
 
 @app.get("/api/cards/{card_id}/audio")
 def list_audio_clips(card_id: str):
