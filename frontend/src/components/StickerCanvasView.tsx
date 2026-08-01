@@ -113,17 +113,19 @@ export const StickerCanvas: React.FC<StickerCanvasProps> = ({ inventory = [], on
 
     setIsBeautifying(true);
     try {
-      const res = await apiFetch('/api/beautify', {
+      // apiFetch returns the parsed JSON payload directly!
+      const data = await apiFetch('/api/beautify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image_base64: imageBase64 }),
       });
 
-      const data = await res.json();
-      if (data.resultUrl) {
-        setAiResultUrl(data.resultUrl);
+      const imageUrl = data?.resultUrl || data?.result_url || data?.image;
+      if (imageUrl) {
+        setAiResultUrl(imageUrl);
       }
     } catch (err) {
+      console.error('Beautify error:', err);
       alert('Failed to bring drawing to life! Please try again.');
     } finally {
       setIsBeautifying(false);

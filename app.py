@@ -545,8 +545,15 @@ async def beautify_drawing(payload: BeautifyRequest):
             
         image_bytes = base64.b64decode(raw_b64)
         result_url = genai_service.beautify_sketch(image_bytes)
+        data_uri = genai_service.beautify_sketch(image_bytes)
         logger.info("[BEAUTIFY SUCCESS] Sketch successfully beautified.")
-        return {"resultUrl": result_url}
+        return {
+            "resultUrl": data_uri,
+            "result_url": data_uri,
+            "image": data_uri,
+            "url": data_uri,
+            "beautified_image": data_uri
+    }
     except Exception as e:
         logger.error(f"[BEAUTIFY ERROR] Failed to beautify drawing: {e}")
         raise HTTPException(status_code=500, detail="Failed to beautify drawing")

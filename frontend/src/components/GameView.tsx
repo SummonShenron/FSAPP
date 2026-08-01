@@ -11,6 +11,8 @@ interface Props {
   cards: SoundCard[];
   onRewardSticker: (cardId: string, stickerEmoji: string) => void;
   engine: ReturnType<typeof useGameEngine>;
+  gameScreen: 'START' | 'PLAYING';
+  setGameScreen: (screen: 'START' | 'PLAYING') => void;
 }
 
 interface Door3DCardProps {
@@ -153,7 +155,21 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
   const [openedDoorId, setOpenedDoorId] = useState<string | null>(null);
   const [isKnocking, setIsKnocking] = useState(false);
   const [wonSticker, setWonSticker] = useState<string | null>(null);
+  const [currentScreen, setCurrentScreen] = useState<'START' | 'GAME'>('START');
+  const [showNewGameWarning, setShowNewGameWarning] = useState(false);
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const handleNewGame = () => {
+    restartGame();
+    if (Array.isArray(inventory)) {
+      inventory.length = 0; // Clears active sticker count
+    }
+    startNewRound();
+    setCurrentScreen('GAME');
+  };
 
+  const handleContinueGame = () => {
+    setCurrentScreen('GAME');
+  };
   const startNewRound = () => {
     if (cards.length < 3) return;
 
@@ -248,7 +264,115 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
       </div>
     );
   }
+  if (currentScreen === 'START') {
+    return (
+      <div className="start-screen-container">
+        {/* Left Controls Column */}
+        <div className="start-screen-controls">
+          <div>
+            <h1 className="start-screen-title">Who's Behind the Door? 🚪</h1>
+            <p className="start-screen-subtitle">Listen closely to the voice and guess who is hiding!</p>
+          </div>
+          {/* Floating Decorative Background Stickers */}
+        <div className="bg-sticker bg-sticker-1">⭐</div>
+        <div className="bg-sticker bg-sticker-2">🦄</div>
+        <div className="bg-sticker bg-sticker-3">🎉</div>
+        <div className="bg-sticker bg-sticker-4">🚀</div>
+        <div className="bg-sticker bg-sticker-5">👑</div>
+        <div className="bg-sticker bg-sticker-6">🌈</div>
+          {/* Center / Right Ajar Door */}
+        <div className="start-screen-door-wrapper">
+          <div className="ajar-door-frame">
+            <div className="eyes-in-shadow">👀</div>
+            <div className="ajar-door-panel">
+              <span className="ajar-door-knob">🟡</span>
+            </div>
+          </div>
+        </div>
+          <div className="start-screen-btn-group">
+            <button 
+              type="button" 
+              className="btn-primary" 
+              onClick={() => setShowNewGameWarning(true)}
+            >
+              ✨ New Game
+            </button>
 
+            <button 
+              type="button" 
+              className="btn-secondary" 
+              onClick={handleContinueGame}
+              style={{ padding: '0.85rem 1.5rem', fontSize: '1.05rem', cursor: 'pointer' }}
+            >
+              ▶️ Continue ({inventory.length} Stickers)
+            </button>
+          </div>
+        </div>
+        {showNewGameWarning && (
+          <div className="warning-modal-overlay">
+            <div className="warning-modal-content">
+              <h2 style={{ margin: '0 0 0.5rem 0', color: '#1e293b', fontSize: '1.5rem' }}>⚠️ Start Fresh?</h2>
+              
+              <p style={{ color: '#475569', marginBottom: '0.75rem', fontSize: '0.95rem', lineHeight: '1.4' }}>
+                This will reset your hearts and clear <strong>all your collected stickers</strong> back to zero!
+              </p>
+              
+              <p style={{ color: '#475569', marginBottom: '1.5rem', fontSize: '0.95rem', lineHeight: '1.4' }}>
+                To keep your current stickers, go back and select <strong>Continue</strong> instead.
+              </p>
+              
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+                <button 
+                  className="btn-secondary" 
+                  onClick={() => setShowNewGameWarning(false)}
+                  style={{ padding: '0.6rem 1rem' }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  className="btn-primary" 
+                  onClick={() => {
+                    setShowNewGameWarning(false);
+                    restartGame();
+                    startNewRound();
+                    setCurrentScreen('GAME');
+                  }}
+                  style={{ padding: '0.6rem 1rem', background: '#ef4444', borderColor: '#dc2626' }}
+                >
+                  Reset Game
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* ❓ COLLAPSIBLE HOW TO PLAY DROPDOWN */}
+      <div className="how-to-play-container">
+        <button 
+          type="button" 
+          className="how-to-play-toggle"
+          onClick={() => setShowHowToPlay(!showHowToPlay)}
+        >
+          <span>❓ How to Play</span>
+          <span>{showHowToPlay ? '▲' : '▼'}</span>
+        </button>
+
+        {showHowToPlay && (
+          <div className="how-to-play-content">
+            <p>
+              <strong>1. Listen:</strong> Click <strong>Knock & Listen</strong> to hear who is hiding.
+            </p>
+            <p>
+              <strong>2. Match:</strong> Look at the hint picture under each door to match clues to the voice.
+            </p>
+            <p>
+              <strong>3. Guess:</strong> Tap the door you think is the right match!
+            </p>
+          </div>
+        )}
+      </div>
+      </div>
+    );
+  }
   return (
     <div className="knock-game-container" style={{ maxWidth: '650px', margin: '0 auto', padding: '0.5rem', position: 'relative' }}> 
       {/* Header with Hearts & Inventory Count */}
@@ -366,6 +490,20 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
           );
         })}
       </div>
+
+      {/* Play Next Round Button */}
+      {openedDoorId && gameState === 'PLAYING' && (
+        <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+          <button 
+            type="button" 
+            className="btn-primary" 
+            onClick={startNewRound} 
+            style={{ margin: '0 auto', fontSize: '0.95rem', padding: '0.5rem 1.25rem', cursor: 'pointer' }}
+          >
+            Next Round ➡️
+          </button>
+        </div>
+      )}
 
       {/* Play Next Round Button */}
       {openedDoorId && gameState === 'PLAYING' && (
