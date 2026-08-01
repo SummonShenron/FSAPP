@@ -239,3 +239,257 @@
   font-weight: bold;
   z-index: 3;
 }
+
+/* ==========================================================================
+   START SCREEN & FLOATING STICKERS
+   ========================================================================== */
+
+.start-screen-container {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  padding: 1rem;
+  max-width: 800px;
+  margin: 0 auto;
+  min-height: 60vh;
+}
+
+/* Floating Background Emoji Stickers */
+.bg-sticker {
+  position: absolute;
+  font-size: 1.8rem;
+  opacity: 0.35;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+  animation: floatEmoji 4s ease-in-out infinite alternate;
+}
+
+.bg-sticker-1 { top: 4%; left: 4%; animation-delay: 0s; }
+.bg-sticker-2 { top: 8%; right: 6%; animation-delay: 0.8s; }
+.bg-sticker-3 { bottom: 12%; left: 6%; animation-delay: 1.5s; }
+.bg-sticker-4 { bottom: 6%; right: 8%; animation-delay: 2.2s; }
+.bg-sticker-5 { top: 48%; left: 2%; animation-delay: 1.1s; }
+.bg-sticker-6 { top: 45%; right: 3%; animation-delay: 1.8s; }
+
+@keyframes floatEmoji {
+  0% { transform: translateY(0px) rotate(-5deg); }
+  100% { transform: translateY(-10px) rotate(10deg); }
+}
+
+/* Controls & Buttons */
+.start-screen-controls {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  text-align: left;
+  z-index: 1;
+}
+
+.start-screen-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--text-main, #1e293b);
+  margin-bottom: 0.25rem;
+  line-height: 1.2;
+}
+
+.start-screen-subtitle {
+  color: var(--text-muted, #64748b);
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.start-screen-btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 280px;
+}
+
+/* Door Frame Sizing */
+.start-screen-door-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1;
+}
+
+.ajar-door-frame {
+  width: 130px;
+  height: 190px;
+  background: #090a0f;
+  border-radius: 16px;
+  border: 5px solid #334155;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  perspective: 800px;
+}
+
+.eyes-in-shadow {
+  position: absolute;
+  top: 38%;
+  left: 65%;
+  transform: translate(-50%, -50%);
+  font-size: 1.6rem;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.9));
+  animation: eyeBlink 4s infinite ease-in-out;
+  z-index: 1;
+  user-select: none;
+}
+
+.ajar-door-panel {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border-radius: 10px;
+  transform-origin: left center;
+  transform: rotateY(-38deg);
+  box-shadow: -8px 0 16px rgba(0, 0, 0, 0.5);
+  z-index: 2;
+  border-right: 3px solid #60a5fa;
+}
+
+.ajar-door-knob {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.3rem;
+}
+
+/* Eye Blink Animation */
+@keyframes eyeBlink {
+  0%, 90%, 100% { opacity: 1; transform: translate(-50%, -50%) scaleY(1); }
+  95% { opacity: 0.1; transform: translate(-50%, -50%) scaleY(0.1); }
+}
+
+/* ==========================================================================
+   MOBILE FIT OVERRIDES (<640px)
+   ========================================================================== */
+@media (max-width: 640px) {
+  .start-screen-container {
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    min-height: auto;
+  }
+  
+  .start-screen-controls {
+    align-items: center;
+    text-align: center;
+    gap: 0.5rem;
+  }
+
+  .start-screen-title {
+    font-size: 1.4rem;
+    margin-bottom: 0.1rem;
+  }
+
+  .start-screen-subtitle {
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .start-screen-btn-group {
+    max-width: 100%;
+    gap: 0.5rem;
+  }
+
+  /* Compact Door for Mobile */
+  .ajar-door-frame {
+    width: 100px;
+    height: 140px;
+    border-width: 4px;
+    border-radius: 12px;
+  }
+
+  .eyes-in-shadow {
+    font-size: 1.3rem;
+    margin-left: 25px;
+  }
+
+  .ajar-door-knob {
+    font-size: 1.1rem;
+    right: 8px;
+  }
+
+  .bg-sticker {
+    font-size: 1.3rem;
+    opacity: 0.25;
+  }
+}
+
+/* ==========================================================================
+   COLLAPSIBLE HOW TO PLAY DROPDOWN
+   ========================================================================== */
+
+.how-to-play-container {
+  margin-top: 0.75rem;
+  width: 100%;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.how-to-play-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.how-to-play-toggle:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.how-to-play-content {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-top: none;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  text-align: left;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  animation: slideDown 0.2s ease-out;
+}
+
+.how-to-play-content p {
+  margin: 0 0 0.4rem 0;
+  font-size: 0.8rem;
+  color: #334155;
+  line-height: 1.35;
+}
+
+.how-to-play-content p:last-child {
+  margin-bottom: 0;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

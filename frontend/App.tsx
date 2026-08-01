@@ -15,7 +15,7 @@ export const App: React.FC = () => {
   const { apiFetch } = useApiClient();
   const [cards, setCards] = useState<SoundCard[]>([]);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
-
+  const [gameScreen, setGameScreen] = useState<'START' | 'PLAYING'>('START');
   // 1. Persist sticker placements in state across tab switches
   const [cardDecorations, setCardDecorations] = useState<Record<string, number[]>>({});
 
@@ -68,7 +68,10 @@ export const App: React.FC = () => {
           {!isAdminOpen && (
             <div style={{ display: 'flex', gap: '0.5rem', backgroundColor: '#f3f4f6', padding: '4px', borderRadius: '12px' }}>
               <button
-                onClick={() => setActiveTab('GAME')}
+                onClick={() => {
+                  setActiveTab('GAME');
+                  setGameScreen('START');
+                }}
                 style={{
                   padding: '0.5rem 1rem',
                   borderRadius: '8px',
