@@ -410,3 +410,65 @@
   70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
   100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
+
+/* ==========================================================================
+   COMPACT SOUNDBOARD GRID & LARGER PHOTOS
+   ========================================================================== */
+
+/* Reduced column width to fit more, smaller cards on screen */
+.soundboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(125px, 1fr));
+  gap: 0.75rem;
+  padding: 0.5rem;
+}
+
+/* Compact Card Container */
+.sound-card.admin-inspect-card {
+  padding: 0.4rem;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: auto;
+}
+
+/* Maximized Photo Wrapper Inside Admin Cards */
+.card-photo-wrapper {
+  width: 100%;
+  height: 115px; /* Gives maximum height to the photo */
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 0.35rem;
+}
+
+.card-photo-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Compact Typography */
+.card-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin: 0.1rem 0;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.card-relation {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.pin-input {
+  box-sizing: border-box;
+  width: 100%;
+  text-align: center;
+  letter-spacing: 0.4em;
+  padding-left: 0.4em; /* Offsets the trailing space after the 4th character */
+  font-size: 1.2rem;
+}
