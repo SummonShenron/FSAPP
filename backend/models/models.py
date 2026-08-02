@@ -23,7 +23,7 @@ class LazyGenAI:
             "Create a concise, vivid image generation prompt under 40 words:\n"
             "1. Identify main objects and colors.\n"
             "2. Polish rough doodles into clean 2D storybook vector art.\n"
-            "3. Keep original layout and add a simple soft background.\n"
+            "3. enhance the original layout and finish the photo.\n"
             "Output ONLY the prompt text."
         )
 

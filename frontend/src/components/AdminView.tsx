@@ -10,6 +10,17 @@ interface Props {
   onClose: () => void;
 }
 
+export const getPhotoUrl = (url?: string) => {
+  if (!url) return 'https://via.placeholder.com/150';
+  
+  // If it's already a full URL (http:// or https://), leave it alone
+  if (url.startsWith('http')) return url;
+  
+  // Prepend your backend URL if it's a relative backend path (/api/photo/...)
+  const API_BASE_URL = 'http://192.168.1.6:8000'; // Or your Cloudflare backend tunnel URL
+  return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
   // Authentication State
   const { apiFetch } = useApiClient();
@@ -421,7 +432,7 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
           >
             <div className="admin-manage-badge">⚙️ Manage</div>
             <div className="card-photo-wrapper">
-              <img src={card.photo_url || card.photo_urls?.[0]} alt={card.title} />
+              <img src={getPhotoUrl(card.photo_url) || card.photo_urls?.[0]} alt={card.title} />
             </div>
             <div className="card-title">{card.title}</div>
             <div className="card-relation">{card.relation}</div>
@@ -493,7 +504,7 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
               <div className="photo-gallery-grid">
                 {currentPhotos.map((url, idx) => (
                   <div key={idx} className="gallery-item" style={{ position: 'relative' }}>
-                    <img src={url} alt={`Photo ${idx + 1}`} />
+                    <img src={getPhotoUrl(url)} alt={`Photo ${idx + 1}`} />
                     <button
                       type="button"
                       className="btn-icon-danger"
