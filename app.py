@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, status, Depends, Request
+from fastapi import FastAPI, HTTPException, Response, UploadFile, File, Form, status, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -526,14 +526,28 @@ def get_photo_file(file_id: str):
     db = get_db()
     if db is None:
         raise HTTPException(status_code=500, detail="Database disabled")
+        
     fs = gridfs.GridFS(db)
     try:
         grid_out = fs.get(ObjectId(file_id))
-        return StreamingResponse(
-            io.BytesIO(grid_out.read()),
-            media_type=grid_out.content_type or "image/jpeg"
+        image_bytes = grid_out.read()
+        
+        # 1. Clean up missing or generic octet-stream content types
+        content_type = grid_out.content_type
+        if not content_type or content_type == "application/octet-stream":
+            content_type = "image/jpeg"
+
+        # 2. Use Response (which includes Content-Length) instead of StreamingResponse
+        return Response(
+            content=image_bytes,
+            media_type=content_type,
+            headers={
+                "Content-Length": str(len(image_bytes)),
+                "Cache-Control": "public, max-age=86400" # Optional caching for speed
+            }
         )
-    except Exception:
+    except Exception as e:
+        logger.error(f"[GET PHOTO ERROR] Failed to fetch photo {file_id}: {e}")
         raise HTTPException(status_code=404, detail="Photo file not found")
 
 @app.post("/api/beautify")
@@ -542,9 +556,8 @@ async def beautify_drawing(payload: BeautifyRequest):
         raw_b64 = payload.image_base64
         if "," in raw_b64:
             raw_b64 = raw_b64.split(",")[1]
-            
+
         image_bytes = base64.b64decode(raw_b64)
-        result_url = genai_service.beautify_sketch(image_bytes)
         data_uri = genai_service.beautify_sketch(image_bytes)
         logger.info("[BEAUTIFY SUCCESS] Sketch successfully beautified.")
         return {
@@ -552,8 +565,8 @@ async def beautify_drawing(payload: BeautifyRequest):
             "result_url": data_uri,
             "image": data_uri,
             "url": data_uri,
-            "beautified_image": data_uri
-    }
+            "beautified_image": data_uri,
+        }
     except Exception as e:
         logger.error(f"[BEAUTIFY ERROR] Failed to beautify drawing: {e}")
         raise HTTPException(status_code=500, detail="Failed to beautify drawing")
