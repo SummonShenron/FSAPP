@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SoundCard } from '../../types';
 import { useApiClient } from '../api/useApiClient';
+import { exportCard, importCard } from '../utils/cardSharing';
 import './__styles__/AdminView.css';
 
 interface Props {
@@ -90,6 +91,30 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
       onRefresh();
     } catch (err) {
       alert('Failed to create card');
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const importedCard = await importCard(file);
+
+      // Post the imported card payload to backend
+      await apiFetch('/api/cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(importedCard),
+      });
+
+      alert(`Successfully imported ${importedCard.title}! 🎉`);
+      onRefresh();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to import card. Please ensure it is a valid card file.');
+    } finally {
+      e.target.value = '';
     }
   };
 
@@ -414,6 +439,29 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
             Add Person
           </div>
         </div>
+
+        {/* Import Person Tile */}
+        <label
+          className="sound-card"
+          style={{ 
+            border: '2px dashed #8b5cf6', 
+            justifyContent: 'center', 
+            minHeight: '200px', 
+            cursor: 'pointer',
+            margin: 0
+          }}
+        >
+          <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📥</div>
+          <div className="card-title" style={{ color: '#8b5cf6' }}>
+            Import Person
+          </div>
+          <input 
+            type="file" 
+            accept=".json" 
+            style={{ display: 'none' }} 
+            onChange={handleImportFile}
+          />
+        </label>
       </div>
 
       {/* INSPECTOR MODAL */}
@@ -422,9 +470,19 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
           <div className="modal-card inspector-modal" onClick={(e) => e.stopPropagation()}>
             <div className="inspector-header">
               <h2>Manage {activeCard.title}</h2>
-              <button className="btn-danger-sm" onClick={() => handleDeleteCard(activeCard.id)}>
-                🗑️ Delete Person
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button 
+                  type="button"
+                  className="btn-secondary-sm" 
+                  onClick={() => exportCard(activeCard)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.4rem 0.75rem' }}
+                >
+                  📤 Export Card
+                </button>
+                <button className="btn-danger-sm" onClick={() => handleDeleteCard(activeCard.id)}>
+                  🗑️ Delete Person
+                </button>
+              </div>
             </div>
 
             {/* Photo Gallery Section */}

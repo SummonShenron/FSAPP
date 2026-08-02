@@ -51,6 +51,7 @@
   background: rgba(239, 68, 68, 0.1);
   color: var(--accent-danger);
   border: 1px solid rgba(239, 68, 68, 0.25);
+  border-bottom: 3px solid rgba(239, 68, 68, 0.25);
   padding: 0.4rem 0.85rem;
   border-radius: 20px;
   font-size: 0.8rem;
@@ -69,6 +70,7 @@
 .btn-danger-sm:active {
   transform: translateY(2px);
   box-shadow: none;
+  border-bottom: 1px solid rgba(239, 68, 68, 0.25);
 }
 
 /* Section Containers (Layered Pastel Panels) */
@@ -377,11 +379,18 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  border-bottom: 3px solid var(--border-color);
 }
 
 .btn-secondary-sm:hover {
   border-color: var(--accent-primary);
   transform: translateY(-1px);
+}
+
+.btn-secondary-sm:active {
+  transform: translateY(2px);
+  border-bottom-width: 1px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 .btn-icon-danger {

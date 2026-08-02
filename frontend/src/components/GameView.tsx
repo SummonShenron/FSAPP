@@ -15,17 +15,94 @@ interface Props {
   setGameScreen: (screen: 'START' | 'PLAYING') => void;
 }
 
+export interface DoorColor {
+  background: string;
+  border: string;
+  highlight: string;
+}
+
 interface Door3DCardProps {
   isOpen: boolean;
+  isAjar?: boolean;
   isKnocking: boolean;
   onClick: () => void;
   doorNumber: number;
+  color?: DoorColor;
 }
 
 interface RoundCard extends SoundCard {
   displayPhoto: string;
   displayFact: string;
 }
+
+// ----------------------------------------------------
+// Silly Monster Definitions
+// ----------------------------------------------------
+interface SillyMonster {
+  id: string;
+  name: string;
+  avatar: string;
+  soundUrl: string;
+  quote: string;
+  clue: string;
+}
+
+export const DOOR_COLORS: DoorColor[] = [
+  { background: 'linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%)', border: '#1e40af', highlight: '#60a5fa' }, // Blue
+  { background: 'linear-gradient(180deg, #ef4444 0%, #dc2626 100%)', border: '#991b1b', highlight: '#fca5a5' }, // Red
+  { background: 'linear-gradient(180deg, #10b981 0%, #059669 100%)', border: '#065f46', highlight: '#6ee7b7' }, // Green
+  { background: 'linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%)', border: '#5b21b6', highlight: '#c4b5fd' }, // Purple
+  { background: 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)', border: '#92400e', highlight: '#fde68a' }, // Orange/Gold
+  { background: 'linear-gradient(180deg, #ec4899 0%, #db2777 100%)', border: '#9d174d', highlight: '#fbcfe8' }, // Pink
+  { background: 'linear-gradient(180deg, #06b6d4 0%, #0891b2 100%)', border: '#164e63', highlight: '#67e8f9' }, // Cyan
+];
+
+const SILLY_MONSTERS: SillyMonster[] = [
+  {
+    id: 'm1',
+    name: 'Giggles the Blob',
+    avatar: '👾',
+    soundUrl: 'https://assets.mixkit.co/active_storage/sfx/2874/2874-preview.mp3',
+    quote: 'BOO! Gotcha!',
+    clue: 'Loves purple jelly & tickles!',
+  },
+  {
+    id: 'm2',
+    name: 'Barnaby Big-Mouth',
+    avatar: '👹',
+    soundUrl: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
+    quote: 'RAWR! (Gimme cookies!)',
+    clue: 'Always hungry for chocolate chip cookies!',
+  },
+  {
+    id: 'm3',
+    name: 'Snicker-Doodle',
+    avatar: '👽',
+    soundUrl: 'https://assets.mixkit.co/active_storage/sfx/131/131-preview.mp3',
+    quote: 'TEE-HEE! Wrong door!',
+    clue: 'Wears polka dot socks everywhere!',
+  },
+  {
+    id: 'm4',
+    name: 'Fuzzy Wuzzy',
+    avatar: '👺',
+    soundUrl: 'https://assets.mixkit.co/active_storage/sfx/2218/2218-preview.mp3',
+    quote: 'BOING! Not here!',
+    clue: 'Loves to jump on trampolines!',
+  },
+  {
+    id: 'm5',
+    name: 'Bubbles the Yeti',
+    avatar: '👻',
+    soundUrl: 'https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3',
+    quote: 'WOOSH! Secret Monster!',
+    clue: 'Enjoys warm bubble baths!',
+  },
+];
+
+type DoorSlot =
+  | { type: 'PERSON'; id: string; card: RoundCard; displayFact: string; color: DoorColor }
+  | { type: 'MONSTER'; id: string; monster: SillyMonster; displayFact: string; color: DoorColor };
 
 // ----------------------------------------------------
 // 3D Door Mesh Component
@@ -44,7 +121,7 @@ export function DoorModel({ isOpen, isKnocking }: { isOpen: boolean; isKnocking:
     return clone;
   }, [scene]);
 
-  const SWING_ANGLE = Math.PI * 0.55; 
+  const SWING_ANGLE = Math.PI * 0.77; 
 
   useFrame((state, delta) => {
     if (leftDoorRef.current) {
@@ -96,8 +173,47 @@ export function DoorModel({ isOpen, isKnocking }: { isOpen: boolean; isKnocking:
 useGLTF.preload('/doubledoor.glb');
 
 // ----------------------------------------------------
-// 3D Canvas Door Component
+// Door Component
 // ----------------------------------------------------
+export const CSSDoorCard: React.FC<Door3DCardProps> = ({ 
+  isOpen, 
+  isAjar = false, 
+  isKnocking = false, 
+  onClick, 
+  doorNumber,
+  color = DOOR_COLORS[0] // Default fallback to blue
+}) => {
+  const doorState = isOpen ? 'open' : isAjar ? 'ajar' : 'closed';
+
+  return (
+    <div 
+      onClick={onClick}
+      className={`css-door-container ${isKnocking ? 'knocking' : ''}`}
+    >
+      {doorNumber && (
+        <span className="door-number-overlay" style={{ zIndex: 10, pointerEvents: 'none' }}>
+          Door #{doorNumber}
+        </span>
+      )}
+      
+      {/* Dark interior slit for peeking eyes */}
+      {isAjar && !isOpen && <div className="css-peeking-eyes">👀</div>}
+
+      {/* Dynamic Colored Door Panel */}
+      <div 
+        className={`css-door-panel ${doorState}`}
+        style={{
+          background: color.background,
+          borderColor: color.border,
+          borderRightColor: color.highlight,
+        }}
+      >
+        <span className="css-door-knob">🟡</span>
+      </div>
+    </div>
+  );
+};
+
 export const Door3DCard: React.FC<Door3DCardProps> = ({ 
   isOpen, 
   isKnocking, 
@@ -150,57 +266,84 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
   } = engine;
 
   const [targetCard, setTargetCard] = useState<RoundCard | null>(null);
-  const [doorOptions, setDoorOptions] = useState<RoundCard[]>([]);
+  const [doorSlots, setDoorSlots] = useState<DoorSlot[]>([]);
   const [activeFilter, setActiveFilter] = useState<VoiceFilter>('normal');
-  const [openedDoorId, setOpenedDoorId] = useState<string | null>(null);
+  const [selectedDoorId, setSelectedDoorId] = useState<string | null>(null);
   const [isKnocking, setIsKnocking] = useState(false);
   const [wonSticker, setWonSticker] = useState<string | null>(null);
   const [currentScreen, setCurrentScreen] = useState<'START' | 'GAME'>('START');
   const [showNewGameWarning, setShowNewGameWarning] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
-  const handleNewGame = () => {
-    restartGame();
-    if (Array.isArray(inventory)) {
-      inventory.length = 0; // Clears active sticker count
-    }
-    startNewRound();
-    setCurrentScreen('GAME');
-  };
 
-  const handleContinueGame = () => {
-    setCurrentScreen('GAME');
-  };
   const startNewRound = () => {
-    if (cards.length < 3) return;
+    if (cards.length < 1) return;
 
-    const shuffled = [...cards].sort(() => 0.5 - Math.random());
-    const selected3 = shuffled.slice(0, 3);
+    // 1. Pick 1 random person from family sound cards
+    const randomPersonCard = cards[Math.floor(Math.random() * cards.length)];
+    const allPhotos = (randomPersonCard.photo_urls && randomPersonCard.photo_urls.length > 0)
+      ? randomPersonCard.photo_urls
+      : (randomPersonCard.photo_url ? [randomPersonCard.photo_url] : ['https://via.placeholder.com/150']);
+    const randomPhoto = allPhotos[Math.floor(Math.random() * allPhotos.length)];
 
-    const roundCards: RoundCard[] = selected3.map((card) => {
-      const allPhotos = (card.photo_urls && card.photo_urls.length > 0)
-        ? card.photo_urls
-        : (card.photo_url ? [card.photo_url] : ['https://via.placeholder.com/150']);
-      const randomPhoto = allPhotos[Math.floor(Math.random() * allPhotos.length)];
+    const allFacts = (randomPersonCard.facts && randomPersonCard.facts.length > 0)
+      ? randomPersonCard.facts
+      : (randomPersonCard.fact ? [randomPersonCard.fact] : ['No clue provided']);
+    const randomFact = allFacts[Math.floor(Math.random() * allFacts.length)];
 
-      const allFacts = (card.facts && card.facts.length > 0)
-        ? card.facts
-        : (card.fact ? [card.fact] : ['No clue provided']);
-      const randomFact = allFacts[Math.floor(Math.random() * allFacts.length)];
+    const personRoundCard: RoundCard = {
+      ...randomPersonCard,
+      displayPhoto: randomPhoto,
+      displayFact: randomFact,
+    };
 
-      return {
-        ...card,
-        displayPhoto: randomPhoto,
-        displayFact: randomFact,
-      };
-    });
+    // 2. Pick 2 unique random trickster monsters
+    const shuffledMonsters = [...SILLY_MONSTERS].sort(() => 0.5 - Math.random());
+    const selectedMonsters = shuffledMonsters.slice(0, 2);
 
-    const target = roundCards[Math.floor(Math.random() * 3)];
+    // 3. Gather fake family clues for the monster doors to disguise them!
+    const allOtherFacts = cards
+      .filter(c => c.id !== randomPersonCard.id)
+      .flatMap(c => (c.facts && c.facts.length > 0) ? c.facts : (c.fact ? [c.fact] : []));
+    
+    let fakeFactsPool = [...allOtherFacts];
+    if (fakeFactsPool.length < 2) {
+      fakeFactsPool = [
+        ...fakeFactsPool, 
+        "Loves to eat pizza!", 
+        "Always wearing silly hats", 
+        "Loves playing hide and seek", 
+        "Can run super fast!"
+      ];
+    }
+    fakeFactsPool.sort(() => 0.5 - Math.random());
+
+    // 4. Pick 3 unique random door colors
+    const shuffledColors = [...DOOR_COLORS].sort(() => 0.5 - Math.random());
+
+    // 5. Assemble the 3 door slots with random colors assigned
+    const personSlot: DoorSlot = {
+      type: 'PERSON',
+      id: personRoundCard.id,
+      card: personRoundCard,
+      displayFact: personRoundCard.displayFact,
+      color: shuffledColors[0],
+    };
+
+    const monsterSlots: DoorSlot[] = selectedMonsters.map((monster, index) => ({
+      type: 'MONSTER',
+      id: monster.id,
+      monster,
+      displayFact: fakeFactsPool[index] || "Loves telling silly jokes!", 
+      color: shuffledColors[index + 1],
+    }));
+
+    const allSlots = [personSlot, ...monsterSlots].sort(() => 0.5 - Math.random());
     const randomFilter = VOICE_FILTERS[Math.floor(Math.random() * VOICE_FILTERS.length)];
 
-    setDoorOptions(roundCards);
-    setTargetCard(target);
+    setDoorSlots(allSlots);
+    setTargetCard(personRoundCard);
     setActiveFilter(randomFilter);
-    setOpenedDoorId(null);
+    setSelectedDoorId(null);
     setWonSticker(null);
     setIsKnocking(false);
   };
@@ -233,54 +376,57 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
     }
   };
 
-  const handleDoorClick = (card: SoundCard) => {
-    if (openedDoorId || gameState !== 'PLAYING') return;
-    setOpenedDoorId(card.id);
-    setIsKnocking(false);
-    const isCorrect = card.id === targetCard?.id;
-    submitGuess(isCorrect);
+  const handleDoorClick = (slot: DoorSlot) => {
+    // If a door has already been selected this round, ignore clicks
+    if (selectedDoorId || gameState !== 'PLAYING') return;
     
-    if (isCorrect) {
-      const clips = (card as any).audio_clips || [];
-      const audioPath = clips.length > 0 ? clips[0].audio_url : (card as any).audio_url;
+    setSelectedDoorId(slot.id);
+    setIsKnocking(false);
+
+    if (slot.type === 'PERSON') {
+      // Correct Guess!
+      submitGuess(true);
+
+      const clips = (slot.card as any).audio_clips || [];
+      const audioPath = clips.length > 0 ? clips[0].audio_url : (slot.card as any).audio_url;
       if (audioPath) {
         const fullUrl = audioPath.startsWith('http') ? audioPath : `http://192.168.1.6:8000${audioPath}`;
         playModifiedAudio(fullUrl, 'normal');
       }
       const reward = STICKERS[Math.floor(Math.random() * STICKERS.length)];
       setWonSticker(reward);
-      onRewardSticker(card.id, reward);
+      onRewardSticker(slot.card.id, reward);
     } else {
-      const oops = new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3');
-      oops.volume = 0.4;
-      oops.play();
+      // Monster Clicked!
+      submitGuess(false);
+
+      const monsterAudio = new Audio(slot.monster.soundUrl);
+      monsterAudio.volume = 0.5;
+      monsterAudio.play().catch(() => {});
     }
   };
 
   if (!targetCard) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
-        Please add at least 3 people to start playing!
+        Please add at least 1 person to start playing!
       </div>
     );
   }
+
+  // --- START SCREEN VIEW ---
   if (currentScreen === 'START') {
     return (
       <div className="start-screen-container">
-        {/* Left Controls Column */}
-        <div className="start-screen-controls">
-          <div>
-            <h1 className="start-screen-title">Who's Behind the Door? 🚪</h1>
-            <p className="start-screen-subtitle">Listen closely to the voice and guess who is hiding!</p>
-          </div>
-          {/* Floating Decorative Background Stickers */}
+        {/* Floating Background Stickers */}
         <div className="bg-sticker bg-sticker-1">⭐</div>
         <div className="bg-sticker bg-sticker-2">🦄</div>
         <div className="bg-sticker bg-sticker-3">🎉</div>
         <div className="bg-sticker bg-sticker-4">🚀</div>
         <div className="bg-sticker bg-sticker-5">👑</div>
         <div className="bg-sticker bg-sticker-6">🌈</div>
-          {/* Center / Right Ajar Door */}
+
+        {/* Center Door */}
         <div className="start-screen-door-wrapper">
           <div className="ajar-door-frame">
             <div className="eyes-in-shadow">👀</div>
@@ -289,6 +435,14 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
             </div>
           </div>
         </div>
+
+        {/* Title & Buttons */}
+        <div className="start-screen-controls">
+          <div>
+            <h1 className="start-screen-title">Who's Behind the Door? 🚪</h1>
+            <p className="start-screen-subtitle">Listen closely to the voice! Watch out for goofy monsters!</p>
+          </div>
+
           <div className="start-screen-btn-group">
             <button 
               type="button" 
@@ -301,26 +455,50 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
             <button 
               type="button" 
               className="btn-secondary" 
-              onClick={handleContinueGame}
+              onClick={() => setCurrentScreen('GAME')}
               style={{ padding: '0.85rem 1.5rem', fontSize: '1.05rem', cursor: 'pointer' }}
             >
               ▶️ Continue ({inventory.length} Stickers)
             </button>
+
+            {/* How to Play Collapsible */}
+            <div className="how-to-play-container">
+              <button 
+                type="button" 
+                className="how-to-play-toggle"
+                onClick={() => setShowHowToPlay(!showHowToPlay)}
+              >
+                <span>❓ How to Play</span>
+                <span>{showHowToPlay ? '▲' : '▼'}</span>
+              </button>
+
+              {showHowToPlay && (
+                <div className="how-to-play-content">
+                  <p>
+                    <strong>1. Listen:</strong> Click <strong>Knock & Listen</strong> to hear who is hiding.
+                  </p>
+                  <p>
+                    <strong>2. Clues:</strong> Read the clues under each door.
+                  </p>
+                  <p>
+                    <strong>3. Watch Out:</strong> Only 1 door has your family member—the other 2 have goofy monsters!
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
+
         {showNewGameWarning && (
           <div className="warning-modal-overlay">
             <div className="warning-modal-content">
               <h2 style={{ margin: '0 0 0.5rem 0', color: '#1e293b', fontSize: '1.5rem' }}>⚠️ Start Fresh?</h2>
-              
               <p style={{ color: '#475569', marginBottom: '0.75rem', fontSize: '0.95rem', lineHeight: '1.4' }}>
                 This will reset your hearts and clear <strong>all your collected stickers</strong> back to zero!
               </p>
-              
               <p style={{ color: '#475569', marginBottom: '1.5rem', fontSize: '0.95rem', lineHeight: '1.4' }}>
-                To keep your current stickers, go back and select <strong>Continue</strong> instead.
+                To keep your current stickers, select <strong>Continue</strong> instead.
               </p>
-              
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
                 <button 
                   className="btn-secondary" 
@@ -345,34 +523,11 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
             </div>
           </div>
         )}
-        {/* ❓ COLLAPSIBLE HOW TO PLAY DROPDOWN */}
-      <div className="how-to-play-container">
-        <button 
-          type="button" 
-          className="how-to-play-toggle"
-          onClick={() => setShowHowToPlay(!showHowToPlay)}
-        >
-          <span>❓ How to Play</span>
-          <span>{showHowToPlay ? '▲' : '▼'}</span>
-        </button>
-
-        {showHowToPlay && (
-          <div className="how-to-play-content">
-            <p>
-              <strong>1. Listen:</strong> Click <strong>Knock & Listen</strong> to hear who is hiding.
-            </p>
-            <p>
-              <strong>2. Match:</strong> Look at the hint picture under each door to match clues to the voice.
-            </p>
-            <p>
-              <strong>3. Guess:</strong> Tap the door you think is the right match!
-            </p>
-          </div>
-        )}
-      </div>
       </div>
     );
   }
+
+  // --- GAME PLAYING VIEW ---
   return (
     <div className="knock-game-container" style={{ maxWidth: '650px', margin: '0 auto', padding: '0.5rem', position: 'relative' }}> 
       {/* Header with Hearts & Inventory Count */}
@@ -402,14 +557,19 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
         </button>
       </div>
 
-      {/* 3-Column Side-By-Side 3D Doors Grid */}
+      {/* 3-Column 3D Doors Grid */}
       <div className="doors-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
-        {doorOptions.map((card, index) => {
-          const isOpen = openedDoorId === card.id;
-          const isTarget = card.id === targetCard.id;
+        {doorSlots.map((slot, index) => {
+          // If ANY door was selected, swing ALL of them open so the user can see everything!
+          const isRevealed = selectedDoorId !== null;
+          
+          // But only apply the glowing/shaking effect to the ONE door they actually clicked.
+          const isClicked = selectedDoorId === slot.id; 
+          const isPerson = slot.type === 'PERSON';
+
           return (
             <div 
-              key={card.id} 
+              key={slot.id} 
               style={{ 
                 borderRadius: '16px', 
                 border: unlockedGoldFrames ? '4px solid #eab308' : '3px solid #facc15', 
@@ -423,10 +583,10 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
                 <span style={{ position: 'absolute', top: '4px', right: '6px', fontSize: '1.2rem', zIndex: 20 }}>👑</span>
               )}
 
-              {/* Door & Photo Area */}
+              {/* Behind Door Area */}
               <div style={{ position: 'relative', height: '180px', backgroundColor: '#1c1917' }}>
                 <div 
-                  className={`revealed-card ${isOpen ? (isTarget ? 'correct-glow' : 'wrong-shake') : ''}`}
+                  className={`revealed-card ${isClicked ? (isPerson ? 'correct-glow' : 'wrong-shake') : ''}`}
                   style={{
                     position: 'absolute',
                     inset: 0,
@@ -438,33 +598,53 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
                     zIndex: 0
                   }}
                 >
-                  <img 
-                    src={card.displayPhoto || 'https://via.placeholder.com/150'} 
-                    alt={card.title} 
-                    style={{
-                      width: '65px',
-                      height: '65px',
-                      borderRadius: '50%',
-                      objectFit: 'cover',
-                      border: '2px solid #3b82f6',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
-                    }}
-                  />
-                  <h4 style={{ margin: '6px 0 0 0', color: '#ffffff', fontSize: '0.85rem', textAlign: 'center' }}>{card.title}</h4>
-                  {isOpen && isTarget && wonSticker && (
-                    <div className="sticker-reward-pop" style={{ marginTop: '4px', fontSize: '0.75rem' }}>
-                      Got {wonSticker}!
+                  {isPerson ? (
+                    // PERSON REVEAL
+                    <>
+                      <img 
+                        src={slot.card.displayPhoto} 
+                        alt={slot.card.title} 
+                        style={{
+                          width: '65px',
+                          height: '65px',
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          border: '2px solid #3b82f6',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
+                        }}
+                      />
+                      <h4 style={{ margin: '6px 0 0 0', color: '#ffffff', fontSize: '0.85rem', textAlign: 'center' }}>{slot.card.title}</h4>
+                      {isClicked && wonSticker && (
+                        <div className="sticker-reward-pop" style={{ marginTop: '4px', fontSize: '0.75rem', color: '#facc15' }}>
+                          Got {wonSticker}!
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    // MONSTER JUMP SCARE REVEAL
+                    <div className="monster-reveal-pop" style={{ textAlign: 'center' }}>
+                      <span style={{ fontSize: '3rem', display: 'block', animation: 'monsterBounce 0.5s infinite alternate' }}>
+                        {slot.monster.avatar}
+                      </span>
+                      <h4 style={{ margin: '4px 0 2px 0', color: '#f87171', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                        {slot.monster.name}
+                      </h4>
+                      <p style={{ margin: 0, color: '#fca5a5', fontSize: '0.65rem', fontStyle: 'italic', lineHeight: '1.1' }}>
+                        "{slot.monster.quote}"
+                      </p>
                     </div>
                   )}
                 </div>
 
                 {/* 3D Door Overlay */}
                 <div style={{ position: 'absolute', inset: 0, zIndex: 5 }}>
-                  <Door3DCard
+                  <CSSDoorCard
                     doorNumber={index + 1}
-                    isOpen={isOpen}
+                    isOpen={isRevealed}
                     isKnocking={isKnocking}
-                    onClick={() => handleDoorClick(card)}
+                    isAjar={false}
+                    color={slot.color}
+                    onClick={() => handleDoorClick(slot)}
                   />
                 </div>
               </div>
@@ -482,7 +662,7 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
                 <span style={{ fontSize: '0.9rem' }}>🕵️</span>
                 <div style={{ textAlign: 'left', overflow: 'hidden' }}>
                   <p style={{ margin: 0, fontSize: '0.7rem', fontWeight: '600', color: '#1f2937', lineHeight: '1.1' }}>
-                    {card.displayFact || "No clue"}
+                    {slot.displayFact}
                   </p>
                 </div>
               </div>
@@ -492,23 +672,14 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
       </div>
 
       {/* Play Next Round Button */}
-      {openedDoorId && gameState === 'PLAYING' && (
-        <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+      {selectedDoorId && gameState === 'PLAYING' && (
+        <div style={{ textAlign: 'center', marginTop: '1rem', animation: 'fadeIn 0.3s ease-out' }}>
           <button 
             type="button" 
             className="btn-primary" 
             onClick={startNewRound} 
             style={{ margin: '0 auto', fontSize: '0.95rem', padding: '0.5rem 1.25rem', cursor: 'pointer' }}
           >
-            Next Round ➡️
-          </button>
-        </div>
-      )}
-
-      {/* Play Next Round Button */}
-      {openedDoorId && gameState === 'PLAYING' && (
-        <div style={{ textAlign: 'center', marginTop: '1rem', animation: 'fadeIn 0.3s ease-out' }}>
-          <button type="button" className="btn-primary" onClick={startNewRound} style={{ margin: '0 auto', fontSize: '0.95rem', padding: '0.5rem 1.25rem' }}>
             Next Round ➡️
           </button>
         </div>
@@ -530,7 +701,7 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
           textAlign: 'center'
         }}>
           <h1 style={{ fontSize: '2.5rem', color: '#fde047', marginBottom: '0.5rem' }}>🎉 VICTORY! 🎉</h1>
-          <p style={{ fontSize: '1.1rem', marginBottom: '1.5rem' }}>You identified everyone in the family!</p>
+          <p style={{ fontSize: '1.1rem', marginBottom: '1.5rem' }}>You identified everyone and outsmarted all the monsters!</p>
 
           {unlockedGoldFrames && (
             <p style={{ background: 'rgba(234, 179, 8, 0.2)', border: '1px solid #facc15', color: '#facc15', padding: '8px 16px', borderRadius: '20px', fontWeight: 'bold', marginBottom: '1.5rem' }}>
@@ -566,7 +737,7 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
           textAlign: 'center'
         }}>
           <h1 style={{ fontSize: '2.2rem', color: '#f87171', marginBottom: '0.5rem' }}>Out of Hearts! 💔</h1>
-          <p style={{ fontSize: '1rem', color: '#d1d5db', marginBottom: '1.5rem' }}>Nice try! Give it another shot!</p>
+          <p style={{ fontSize: '1rem', color: '#d1d5db', marginBottom: '1.5rem' }}>The monsters tricked you! Give it another shot!</p>
           <button 
             className="btn-primary" 
             onClick={() => {
