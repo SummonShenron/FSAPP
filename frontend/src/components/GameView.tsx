@@ -7,6 +7,8 @@ import { PivotControls, useGLTF } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
+export type MonsterFeature = 'SILHOUETTE' | 'EYE' | 'CLAW' | 'WARNING' | 'FOG';
+
 interface Props {
   cards: SoundCard[];
   onRewardSticker: (cardId: string, stickerEmoji: string) => void;
@@ -28,6 +30,7 @@ interface Door3DCardProps {
   onClick: () => void;
   doorNumber: number;
   color?: DoorColor;
+  monsterFeature?: MonsterFeature;
 }
 
 interface RoundCard extends SoundCard {
@@ -100,9 +103,10 @@ const SILLY_MONSTERS: SillyMonster[] = [
   },
 ];
 
-type DoorSlot =
+type DoorSlot = (
   | { type: 'PERSON'; id: string; card: RoundCard; displayFact: string; color: DoorColor }
-  | { type: 'MONSTER'; id: string; monster: SillyMonster; displayFact: string; color: DoorColor };
+  | { type: 'MONSTER'; id: string; monster: SillyMonster; displayFact: string; color: DoorColor }
+) & { monsterFeature: MonsterFeature };
 
 // ----------------------------------------------------
 // 3D Door Mesh Component
@@ -175,32 +179,23 @@ useGLTF.preload('/doubledoor.glb');
 // ----------------------------------------------------
 // Door Component
 // ----------------------------------------------------
-export const CSSDoorCard: React.FC<Door3DCardProps> = ({ 
-  isOpen, 
-  isAjar = false, 
-  isKnocking = false, 
-  onClick, 
+export const CSSDoorCard: React.FC<Door3DCardProps> = ({
+  isOpen,
+  isAjar = false,
+  isKnocking = false,
+  onClick,
   doorNumber,
-  color = DOOR_COLORS[0] // Default fallback to blue
+  color = DOOR_COLORS[0],
+  monsterFeature,
 }) => {
   const doorState = isOpen ? 'open' : isAjar ? 'ajar' : 'closed';
 
   return (
-    <div 
+    <div
       onClick={onClick}
       className={`css-door-container ${isKnocking ? 'knocking' : ''}`}
     >
-      {doorNumber && (
-        <span className="door-number-overlay" style={{ zIndex: 10, pointerEvents: 'none' }}>
-          Door #{doorNumber}
-        </span>
-      )}
-      
-      {/* Dark interior slit for peeking eyes */}
-      {isAjar && !isOpen && <div className="css-peeking-eyes">👀</div>}
-
-      {/* Dynamic Colored Door Panel */}
-      <div 
+      <div
         className={`css-door-panel ${doorState}`}
         style={{
           background: color.background,
@@ -208,7 +203,37 @@ export const CSSDoorCard: React.FC<Door3DCardProps> = ({
           borderRightColor: color.highlight,
         }}
       >
-        <span className="css-door-knob">🟡</span>
+        {doorNumber && (
+          <div className="door-number-overlay-badge">
+            Door #{doorNumber}
+          </div>
+        )}
+
+        {/* {!isOpen && monsterFeature === 'SILHOUETTE' && (
+          <div className="door-window-arch">
+            <div className="shadow-silhouette">👹</div>
+          </div>
+        )} */}
+
+        {!isOpen && monsterFeature === 'EYE' ? (
+          <div className="keyhole-eye-container">
+            <div className="monster-pupil" />
+          </div>
+        ) : (
+          !isOpen && <span className="css-door-knob" />
+        )}
+
+        {!isOpen && monsterFeature === 'WARNING' && (
+          <div className="monster-warning-sticker">KEEP OUT!</div>
+        )}
+
+        {!isOpen && monsterFeature === 'CLAW' && (
+          <div className="bottom-monster-peek">👾</div>
+        )}
+{/* 
+        {!isOpen && monsterFeature === 'FOG' && (
+          <div className="bottom-smoke-puff">💨 💨</div>
+        )} */}
       </div>
     </div>
   );
@@ -274,11 +299,28 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
   const [currentScreen, setCurrentScreen] = useState<'START' | 'GAME'>('START');
   const [showNewGameWarning, setShowNewGameWarning] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const WHOOSH_SOUND_URL = '/whoosh.mp3';
+  
+  const [roundKey, setRoundKey] = useState<number>(1);
+  const [isExiting, setIsExiting] = useState<boolean>(false);
 
   const startNewRound = () => {
+    // 1. Guard clause: ensure we have cards to play with
     if (cards.length < 1) return;
+    
+    // Play Whoosh Sound
+    try {
+      const whooshSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3');
+      whooshSound.volume = 0.3;
+      whooshSound.play().catch(() => {});
+    } catch (e) {
+      // Ignore if browser restricts autoplay
+    }
 
-    // 1. Pick 1 random person from family sound cards
+    // Increment round key to force animation reset
+    setRoundKey(prev => prev + 1);
+    
+    // 2. Pick 1 random person from family sound cards
     const randomPersonCard = cards[Math.floor(Math.random() * cards.length)];
     const allPhotos = (randomPersonCard.photo_urls && randomPersonCard.photo_urls.length > 0)
       ? randomPersonCard.photo_urls
@@ -296,11 +338,11 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
       displayFact: randomFact,
     };
 
-    // 2. Pick 2 unique random trickster monsters
+    // 3. Pick 2 unique random trickster monsters
     const shuffledMonsters = [...SILLY_MONSTERS].sort(() => 0.5 - Math.random());
     const selectedMonsters = shuffledMonsters.slice(0, 2);
 
-    // 3. Gather fake family clues for the monster doors to disguise them!
+    // 4. Gather fake family clues for the monster doors to disguise them!
     const allOtherFacts = cards
       .filter(c => c.id !== randomPersonCard.id)
       .flatMap(c => (c.facts && c.facts.length > 0) ? c.facts : (c.fact ? [c.fact] : []));
@@ -317,16 +359,19 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
     }
     fakeFactsPool.sort(() => 0.5 - Math.random());
 
-    // 4. Pick 3 unique random door colors
+    // 5. Pick 3 unique random door colors & feature details
     const shuffledColors = [...DOOR_COLORS].sort(() => 0.5 - Math.random());
+    const ALL_FEATURES: MonsterFeature[] = ['SILHOUETTE', 'EYE', 'CLAW', 'WARNING', 'FOG'];
+    const shuffledFeatures = [...ALL_FEATURES].sort(() => 0.5 - Math.random());
 
-    // 5. Assemble the 3 door slots with random colors assigned
+    // 6. Assemble the 3 door slots with features and colors
     const personSlot: DoorSlot = {
       type: 'PERSON',
       id: personRoundCard.id,
       card: personRoundCard,
       displayFact: personRoundCard.displayFact,
       color: shuffledColors[0],
+      monsterFeature: shuffledFeatures[0],
     };
 
     const monsterSlots: DoorSlot[] = selectedMonsters.map((monster, index) => ({
@@ -335,8 +380,10 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
       monster,
       displayFact: fakeFactsPool[index] || "Loves telling silly jokes!", 
       color: shuffledColors[index + 1],
+      monsterFeature: shuffledFeatures[index + 1],
     }));
 
+    // 7. Shuffle all slots together & set state
     const allSlots = [personSlot, ...monsterSlots].sort(() => 0.5 - Math.random());
     const randomFilter = VOICE_FILTERS[Math.floor(Math.random() * VOICE_FILTERS.length)];
 
@@ -346,6 +393,17 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
     setSelectedDoorId(null);
     setWonSticker(null);
     setIsKnocking(false);
+  };
+
+  const handleNextRound = () => {
+    if (isExiting) return; // Prevent double-clicking during animation
+    setIsExiting(true);
+
+    // Wait for exit animation & stagger delay to complete (approx 550ms)
+    setTimeout(() => {
+      startNewRound();
+      setIsExiting(false);
+    }, 700);
   };
 
   useEffect(() => {
@@ -405,15 +463,7 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
       monsterAudio.play().catch(() => {});
     }
   };
-
-  if (!targetCard) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        Please add at least 1 person to start playing!
-      </div>
-    );
-  }
-
+  
   // --- START SCREEN VIEW ---
   if (currentScreen === 'START') {
     return (
@@ -529,7 +579,7 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
 
   // --- GAME PLAYING VIEW ---
   return (
-    <div className="knock-game-container" style={{ maxWidth: '650px', margin: '0 auto', padding: '0.5rem', position: 'relative' }}> 
+    <div className="knock-game-container" style={{ maxWidth: '650px', margin: '0 auto', padding: '0.5rem', position: 'relative', overflowX: 'hidden' }}> 
       {/* Header with Hearts & Inventory Count */}
       <div className="game-header" style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
         <h2 style={{ fontSize: '1.4rem', color: 'var(--text-main)', margin: '0 0 0.25rem 0' }}>
@@ -569,7 +619,8 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
 
           return (
             <div 
-              key={slot.id} 
+              key={`round-${roundKey}-door-${slot.id}`} 
+              className={isExiting ? 'door-slide-exit' : 'door-slide-enter'}
               style={{ 
                 borderRadius: '16px', 
                 border: unlockedGoldFrames ? '4px solid #eab308' : '3px solid #facc15', 
@@ -644,6 +695,7 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
                     isKnocking={isKnocking}
                     isAjar={false}
                     color={slot.color}
+                    monsterFeature={slot.monsterFeature}
                     onClick={() => handleDoorClick(slot)}
                   />
                 </div>
@@ -677,7 +729,8 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
           <button 
             type="button" 
             className="btn-primary" 
-            onClick={startNewRound} 
+            onClick={handleNextRound}
+            disabled={isExiting}
             style={{ margin: '0 auto', fontSize: '0.95rem', padding: '0.5rem 1.25rem', cursor: 'pointer' }}
           >
             Next Round ➡️
@@ -712,7 +765,7 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
             className="btn-primary" 
             onClick={() => {
               restartGame();
-              startNewRound();
+              handleNextRound();
             }}
             style={{ fontSize: '1.1rem', padding: '0.85rem 1.75rem' }}
           >
@@ -742,7 +795,7 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
             className="btn-primary" 
             onClick={() => {
               restartGame();
-              startNewRound();
+              handleNextRound();
             }}
             style={{ fontSize: '1.1rem', padding: '0.85rem 1.75rem' }}
           >

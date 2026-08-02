@@ -1,6 +1,7 @@
 import base64
 import io
 import os
+import random
 import re
 import ssl
 import urllib.parse
@@ -19,12 +20,13 @@ class LazyGenAI:
 
     def _get_working_vision_prompt(self, drawing_image) -> str:
         prompt_text = (
-            "This image is a canvas drawing made by a child.\n"
-            "Create a concise, vivid image generation prompt under 40 words:\n"
-            "1. Identify main objects and colors.\n"
-            "2. Polish rough doodles into clean 2D storybook vector art.\n"
-            "3. enhance the original layout and finish the photo.\n"
-            "Output ONLY the prompt text."
+            "This image is a canvas drawing made by a 4-year-old child, containing rough doodles, colors, and emojis.\n"
+            "Create an image generation prompt that follows these rules strictly:\n\n"
+            "1. INTERPRET INTENTION: Recognize what the child was trying to draw (e.g., a unicorn, house, sun, person, emojis).\n"
+            "2. CORRECT & CLEAN UP: Smooth out shaky lines, fix crude shapes, and finish the drawing.\n"
+            "3. KEEP COMPOSITION: Keep every drawn subject, emoji, and color in its original position on the canvas. Do NOT move them around or replace them with completely different objects.\n"
+            "4. EXTEND BACKGROUND: Naturally build out a soft, 2d like background environment behind and around the corrected figures .\n\n"
+            "Output ONLY the final detailed prompt for the image generator, nothing else."
         )
 
         try:
@@ -34,13 +36,15 @@ class LazyGenAI:
                 contents=[drawing_image, prompt_text]
             )
             raw_prompt = response.text.strip()
-            # Clean up newlines and excessive spaces for safe URL usage
             cleaned_prompt = re.sub(r'\s+', ' ', raw_prompt)
             print(f"[STEP 1 SUCCESS] Raw Prompt: {cleaned_prompt}")
             return cleaned_prompt
         except Exception as e:
-            print(f"[STEP 1 WARNING] Vision API failed ({e}). Using default prompt.")
-            return "Charming 2D children storybook vector illustration, colorful rocket blasting into space, clean lines"
+            print(f"[STEP 1 WARNING] Vision API failed ({e}). Falling back to a child-doodle interpretation prompt.")
+            return (
+                "A bright, whimsical child-doodle scene with the same drawn subject on a clean white canvas, "
+                "smooth clean outlines, playful storybook colors, soft 2D background, cheerful and polished"
+            )
 
     def beautify_sketch(self, image_bytes: bytes) -> str:
         try:
@@ -56,8 +60,12 @@ class LazyGenAI:
             short_prompt = enhanced_prompt[:250]
             print(f"[STEP 2] Rendering via Pollinations FLUX with prompt: {short_prompt}")
 
+            seed = random.randint(1, 999999)
             encoded_prompt = urllib.parse.quote(short_prompt)
-            url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=600&nologo=true&model=flux"
+            url = (
+                f"https://image.pollinations.ai/prompt/{encoded_prompt}"
+                f"?width=800&height=600&nologo=true&model=flux&seed={seed}"
+            )
 
             # Create unverified SSL context to prevent SSL cert hangs
             ctx = ssl.create_default_context()
