@@ -330,7 +330,15 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
       : 'https://fsapp-ci88.onrender.com');
   const resolveAudioUrl = (audioPath: string) => {
     if (!audioPath) return '';
-    if (audioPath.startsWith('http')) return audioPath;
+    
+    if (audioPath.startsWith('http')) {
+      // If it's an external link (not hosted on your server), wrap it in the proxy
+      if (!audioPath.startsWith(API_BASE_URL) && !audioPath.startsWith(window.location.origin)) {
+        return `${API_BASE_URL}/api/proxy-audio?url=${encodeURIComponent(audioPath)}`;
+      }
+      return audioPath;
+    }
+    
     return `${API_BASE_URL}${audioPath.startsWith('/') ? '' : '/'}${audioPath}`;
   };
   const playPublicSound = (audioPath: string, volume = 0.5) => {
@@ -603,7 +611,7 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
     setIsKnocking(false);
 
     if (slot.type === 'PERSON') {
-      submitGuess(true);
+      submitGuess(true, slot.card.id);
       playCorrectDoorSound();
       const clips = (slot.card as any).audio_clips || [];
       const audioPath = clips.length > 0 ? clips[0].audio_url : (slot.card as any).audio_url;
@@ -719,6 +727,20 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
                   </p>
                 </div>
               )}
+              {/* ✨ NEW: Cost-Sensitive Infrastructure Notice */}
+            <div style={{
+              marginTop: '1rem',
+              padding: '0.8rem 1rem',
+              borderRadius: 8,
+              background: 'linear-gradient(90deg, rgba(255,249,230,1) 0%, rgba(255,243,230,1) 100%)',
+              border: '1px solid #f59e0b',
+              color: '#92400e',
+              textAlign: 'left',
+              fontSize: '0.82rem',
+              lineHeight: '1.4'
+            }}>
+              <strong>Server Notice:</strong> We run on cost‑sensitive infrastructure. If sounds or round actions take a moment to load after inactivity, the backend server may be waking up. Please wait 30–60 seconds if a request hangs!
+            </div>
             </div>
           </div>
         </div>

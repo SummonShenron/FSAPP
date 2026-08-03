@@ -680,30 +680,7 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
                   />
                 </label>
 
-                <div style={{ textAlign: 'center', fontSize: '0.85rem', color: '#6b7280' }}>— OR —</div>
-
-                {/* URL Form */}
-                <form onSubmit={handleAddAudioUrl} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <input
-                    type="text"
-                    placeholder="Clip Label (e.g. Laughing)"
-                    value={audioLabelInput}
-                    onChange={(e) => setAudioLabelInput(e.target.value)}
-                    style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', textAlign: 'left', letterSpacing: 'normal' }}
-                  />
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <input
-                      type="url"
-                      placeholder="Paste Audio/Video URL (https://...)"
-                      value={audioUrlInput}
-                      onChange={(e) => setAudioUrlInput(e.target.value)}
-                      style={{ flex: 1, padding: '0.4rem 0.6rem', fontSize: '0.85rem', textAlign: 'left', letterSpacing: 'normal' }}
-                    />
-                    <button type="submit" className="btn-secondary-sm" disabled={!audioUrlInput.trim()}>
-                      Add URL
-                    </button>
-                  </div>
-                </form>
+                <div style={{ textAlign: 'center', fontSize: '0.85rem', color: '#6b7280' }}></div>
               </div>
             </div>
 

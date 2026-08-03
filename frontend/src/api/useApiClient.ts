@@ -1,22 +1,22 @@
 import { useAuth } from '@clerk/clerk-react';
 
 export const getApiBaseUrl = () => {
-  // If explicitly provided via environment variables (Vite/React)
-  if (import.meta.env?.VITE_API_URL) {
+  const hostname = window.location.hostname;
+  const isLocalHost =
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '192.168.1.6';
+
+  // 1) Local dev should always prefer the local backend
+  if (import.meta.env.DEV && isLocalHost) {
+    return 'http://192.168.1.6:8000';
+  }
+
+  if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
 
-  // Local development fallback
-  const isLocalHost = 
-    window.location.hostname === 'localhost' || 
-    window.location.hostname === '127.0.0.1' || 
-    window.location.hostname === '192.168.1.6';
-
-  if (isLocalHost) {
-    return 'http://192.168.1.6:8000'; // or http://localhost:8000
-  }
-
-  // Production Render Backend
+  // 3) Final fallback
   return 'https://fsapp-ci88.onrender.com';
 };
 
@@ -26,25 +26,30 @@ export const useApiClient = () => {
   const { getToken } = useAuth();
 
   const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
-    const fullUrl = `${API_BASE_URL}${endpoint}` ;
+    const fullUrl = `${API_BASE_URL}${endpoint}`;
     const method = options.method || 'GET';
-
     console.log(`[API START] Initiating ${method} -> ${fullUrl}`);
-
-    let token: string | null = null;
-    try {
-      token = await getToken();
-      console.log(`[API AUTH] Token status: ${token ? 'Acquired' : 'No token returned'}`);
-    } catch (err) {
-      console.error(`[API AUTH ERROR] Failed to get Clerk token:`, err);
-    }
 
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
     };
 
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+    // 🔑 READ FROM STORAGE DIRECTLY: Bulletproof and works instantly anywhere in the app.
+    const guestToken = localStorage.getItem('guest_token');
+    const isGuest = guestToken === 'guest-sandbox-token';
+
+    if (isGuest) {
+      console.log(`[API GUEST MODE] Attaching sandbox token to request headers.`);
+      headers['Authorization'] = 'Bearer guest-sandbox-token';
+    } else {
+      try {
+        const token = await getToken({ skipCache: true });
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+      } catch (err) {
+        console.warn('No Clerk token acquired:', err);
+      }
     }
 
     if (!(options.body instanceof FormData) && !headers['Content-Type']) {
@@ -57,20 +62,19 @@ export const useApiClient = () => {
 
     try {
       const response = await fetch(fullUrl, { ...options, headers });
-
       console.log(`[API RESPONSE STATUS] ${response.status} ${response.statusText} for ${endpoint}`);
-
+      
       if (response.status === 401) {
         console.error(`[API ERROR 401] Unauthorized request to ${endpoint}`);
         throw new Error('Unauthorized: Please log in again.');
       }
-
+      
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`[API ERROR ${response.status}] Message: ${errorText}`);
         throw new Error(`API Error (${response.status}): ${response.statusText}`);
       }
-
+      
       const data = await response.json();
       console.log(`[API SUCCESS] Received data from ${endpoint}:`, data);
       return data;

@@ -4,7 +4,9 @@ from pydantic import BaseModel
 from typing import List, Optional
 import os
 import gridfs
+import re
 import base64
+import httpx
 from fastapi.responses import StreamingResponse
 import io
 from bson import ObjectId
@@ -71,6 +73,11 @@ class PinVerification(BaseModel):
 class CardOrderUpdate(BaseModel):
     card_ids: List[str]
 
+class UserProgressUpdate(BaseModel):
+    saved_card_ids: Optional[List[str]] = []
+    inventory: Optional[List[dict]] = []
+    card_decorations: Optional[dict] = {}
+
 class SoundCardUpdate(BaseModel):
     title: Optional[str] = None
     relation: Optional[str] = None
@@ -95,9 +102,134 @@ async def log_incoming_requests(request: Request, call_next):
     logger.info("======================================================")
     return response
 
+@app.get("/api/proxy-audio")
+async def proxy_audio(url: str):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    
+    target_url = url
+    
+    # 🎯 Instantly convert MyInstants page URLs to direct raw .mp3 URLs
+    if "myinstants.com" in target_url and not target_url.endswith(".mp3"):
+        match = re.search(r"/instant/([^/?#]+)", target_url)
+        if match:
+            slug = match.group(1)
+            target_url = f"https://www.myinstants.com/media/sounds/{slug}.mp3"
+
+    client = httpx.AsyncClient()
+    try:
+        req = client.build_request("GET", target_url, headers=headers, follow_redirects=True)
+        response = await client.send(req, stream=True)
+        
+        if response.status_code != 200:
+            await client.aclose()
+            raise HTTPException(status_code=400, detail=f"External server error: {response.status_code}")
+            
+        content_type = response.headers.get("content-type", "audio/mpeg")
+        
+        if "text/html" in content_type.lower():
+            await client.aclose()
+            raise HTTPException(status_code=400, detail="Target URL did not return a valid audio stream.")
+
+        return StreamingResponse(
+            response.aiter_bytes(), 
+            media_type=content_type,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Accept-Ranges": "bytes"
+            }
+        )
+    except Exception as e:
+        await client.aclose()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+# --- Get Saved Cards & Stickers for Current User ---
+@app.get("/api/user/progress")
+def get_user_progress(current_user: dict = Depends(get_current_user)):
+    user_id = current_user["sub"]
+    db = get_db()
+    if db is None:
+        return {"saved_card_ids": [], "inventory": [], "card_decorations": {}}
+    
+    progress = db.user_progress.find_one({"user_id": user_id})
+    if not progress:
+        return {"saved_card_ids": [], "inventory": [], "card_decorations": {}}
+    logger.info("================== USER PROGRESS POST ==================")
+    logger.info(f"User ID: {user_id}")
+    logger.info(f"Saved Card IDs ({len(progress.get('saved_card_ids', []) or [])}): {progress.get('saved_card_ids', [])}")
+    logger.info(f"Inventory Count: {len(progress.get('inventory', []) or [])}")
+    logger.info(f"Inventory Data: {progress.get('inventory', [])}")
+    logger.info(f"Card Decorations: {progress.get('card_decorations', {})}")
+    logger.info("=======================================================")    
+    return {
+        "saved_card_ids": progress.get("saved_card_ids", []),
+        "inventory": progress.get("inventory", []),
+        "card_decorations": progress.get("card_decorations", {})
+    }
+
+
+# --- 3. POST Progress (Save cards AND stickers) ---
+@app.post("/api/user/progress")
+def update_user_progress(payload: UserProgressUpdate, current_user: dict = Depends(get_current_user)):
+    user_id = current_user["sub"]
+    db = get_db()
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database disabled")
+    logger.info("================== USER PROGRESS POST ==================")
+    logger.info(f"User ID: {user_id}")
+    logger.info(f"Saved Card IDs ({len(payload.saved_card_ids or [])}): {payload.saved_card_ids}")
+    logger.info(f"Inventory Count: {len(payload.inventory or [])}")
+    logger.info(f"Inventory Data: {payload.inventory}")
+    logger.info(f"Card Decorations: {payload.card_decorations}")
+    logger.info("=======================================================")
+    update_doc = {}
+    # Append new saved cards without duplicates
+    if payload.saved_card_ids:
+        update_doc["$addToSet"] = {
+            "saved_card_ids": {"$each": payload.saved_card_ids}
+        }
+        
+    # Overwrite current inventory & placed sticker positions
+    set_fields = {}
+    if payload.inventory is not None:
+        set_fields["inventory"] = payload.inventory
+    if payload.card_decorations is not None:
+        set_fields["card_decorations"] = payload.card_decorations
+        
+    if set_fields:
+        update_doc["$set"] = set_fields
+
+    if update_doc:
+        db.user_progress.update_one(
+            {"user_id": user_id},
+            update_doc,
+            upsert=True
+        )
+
+    logger.info(f"[USER PROGRESS] Updated cards & stickers for user {user_id}")
+    return {"status": "success"}
+
+
+# --- 4. DELETE Progress (Reset cards AND stickers on new game) ---
+@app.delete("/api/user/progress")
+def reset_user_progress(current_user: dict = Depends(get_current_user)):
+    user_id = current_user["sub"]
+    db = get_db()
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database disabled")
+        
+    db.user_progress.update_one(
+        {"user_id": user_id},
+        {"$set": {"saved_card_ids": [], "inventory": [], "card_decorations": {}}}
+    )
+    logger.info(f"[USER PROGRESS] Reset all user progress for user {user_id}")
+    return {"status": "success"}
+
 @app.get("/api/cards")
 def get_sound_cards(current_user: dict = Depends(get_current_user)):
-    user_id = current_user["sub"]
+    is_guest = current_user.get("is_guest", False) if isinstance(current_user, dict) else False
+    user_id = "guest_user_demo" if is_guest else current_user.get("sub", "guest_user_demo")
     logger.info(f"[GET CARDS] Fetching cards for user: {user_id}")
     db = get_db()
     if db is None:
@@ -113,12 +245,20 @@ def get_sound_cards(current_user: dict = Depends(get_current_user)):
         clips = list(db.audio_clips.find({"card_id": ObjectId(card["id"])}))
         audio_clips = []
         for clip in clips:
+            # Safely resolve URL whether it's an external link or a GridFS file
+            if "audio_url" in clip:
+                clip_url = clip["audio_url"]
+            elif "file_id" in clip:
+                clip_url = f"/api/audio/{str(clip['file_id'])}"
+            else:
+                clip_url = ""
+
             audio_clips.append({
                 "id": str(clip["_id"]),
                 "card_id": str(clip["card_id"]),
                 "label": clip.get("label", "Voice Clip"),
                 "is_daily_postcard": clip.get("is_daily_postcard", False),
-                "audio_url": f"/api/audio/{str(clip['file_id'])}"
+                "audio_url": clip_url
             })
         card["audio_clips"] = audio_clips
         
