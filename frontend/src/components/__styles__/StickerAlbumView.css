@@ -1,0 +1,20 @@
+.restart-btn {
+    border-bottom: 6px solid #cb1212 !important; 
+    font-size: 0.85rem;
+    padding: 0.6rem 1rem;
+    background-color: #fee2e2;
+    color: #dc2626;
+    border: 2px solid #cb1212;
+    border-radius: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.restart-btn:active {
+    
+    border-bottom: 2px solid #cb1212 !important; 
+    transition: all 0.2s ease;
+    translate: translateY(+2)
+}

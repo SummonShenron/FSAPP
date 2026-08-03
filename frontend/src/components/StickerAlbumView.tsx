@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Sticker, StickerRarity } from '../stickers/Stickers';
 import { SoundCard } from '../../types';
-
+import './__styles__/StickerAlbumView.css';
 interface StickerAlbumProps {
   inventory: Sticker[];
   cards: SoundCard[];
+  savedCardIds?: string[];
   cardDecorations?: Record<string, number[]>;
   onUpdateDecorations: React.Dispatch<React.SetStateAction<Record<string, number[]>>>;
   onBackToGame: () => void;
@@ -14,13 +15,14 @@ interface StickerAlbumProps {
 export const StickerAlbum: React.FC<StickerAlbumProps> = ({
   inventory = [],
   cards = [],
+  savedCardIds = [],
   cardDecorations = {},
   onUpdateDecorations = () => {},
   onBackToGame,
   onRestartGame
 }) => {
   const [selectedInventoryIndex, setSelectedInventoryIndex] = useState<number | null>(null);
-
+  const savedCards = cards.filter((card) => savedCardIds.includes(card.id));
   // 1. Get all inventory indices already pinned onto cards
   const safeDecorations = cardDecorations || {};
   const placedIndices = new Set(Object.values(safeDecorations).flat());
@@ -143,18 +145,10 @@ export const StickerAlbum: React.FC<StickerAlbumProps> = ({
         </div>
 
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <button
+          <button  
             onClick={handleRestartConfirm}
-            style={{
-              fontSize: '0.85rem',
-              padding: '0.6rem 0.9rem',
-              backgroundColor: '#fee2e2',
-              color: '#dc2626',
-              border: '1px solid #fca5a5',
-              borderRadius: '12px',
-              fontWeight: 'bold',
-              cursor: 'pointer'
-            }}
+            className="restart-btn"
+            style={{ fontSize: '0.9rem', padding: '0.6rem 1rem' }}
           >
             🔄 Restart Game
           </button>
@@ -195,58 +189,73 @@ export const StickerAlbum: React.FC<StickerAlbumProps> = ({
 
       {/* Decoration Board */}
       <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#1f2937', marginBottom: '1rem' }}>
-        🖼️ Decorate Your Family Cards
+        🖼️ Decorate Saved Family Cards ({savedCards.length} / {cards.length})
       </h3>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '1rem' }}>
-        {cards.map((card) => {
-          const placedIndicesOnCard = safeDecorations[card.id] || [];
+      {savedCards.length === 0 ? (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '2rem', 
+          backgroundColor: '#f9fafb', 
+          borderRadius: '16px', 
+          border: '2px dashed #d1d5db' 
+        }}>
+          <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.5rem' }}>🚪 Lock & Key</span>
+          <p style={{ margin: 0, fontWeight: 'bold', color: '#4b5563' }}>No family members saved yet!</p>
+          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#9ca3af' }}>
+            Play the Knocking Game and guess the correct doors to unlock family cards here!
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '1rem' }}>
+          {savedCards.map((card) => {
+            const placedIndicesOnCard = safeDecorations[card.id] || [];
 
-          return (
-            <div
-              key={card.id}
-              onClick={() => handleStickToCard(card.id)}
-              style={{
-                position: 'relative',
-                backgroundColor: '#ffffff',
-                borderRadius: '16px',
-                padding: '0.75rem',
-                border: selectedInventoryIndex !== null ? '3px dashed #10b981' : '1px solid #e5e7eb',
-                textAlign: 'center',
-                cursor: selectedInventoryIndex !== null ? 'pointer' : 'default',
-                boxShadow: selectedInventoryIndex !== null ? '0 4px 12px rgba(16, 185, 129, 0.2)' : '0 2px 6px rgba(0,0,0,0.05)',
-                minHeight: '140px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <img
-                src={card.photo_url || card.photo_urls?.[0] || 'https://via.placeholder.com/100'}
-                alt={card.title}
-                style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover' }}
-              />
-              <span style={{ fontWeight: 'bold', fontSize: '0.85rem', marginTop: '6px', color: '#374151' }}>
-                {card.title}
-              </span>
+            return (
+              <div
+                key={card.id}
+                onClick={() => handleStickToCard(card.id)}
+                style={{
+                  position: 'relative',
+                  backgroundColor: '#ffffff',
+                  borderRadius: '16px',
+                  padding: '0.75rem',
+                  border: selectedInventoryIndex !== null ? '3px dashed #10b981' : '1px solid #e5e7eb',
+                  textAlign: 'center',
+                  cursor: selectedInventoryIndex !== null ? 'pointer' : 'default',
+                  boxShadow: selectedInventoryIndex !== null ? '0 4px 12px rgba(16, 185, 129, 0.2)' : '0 2px 6px rgba(0,0,0,0.05)',
+                  minHeight: '140px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <img
+                  src={card.photo_url || card.photo_urls?.[0] || 'https://via.placeholder.com/100'}
+                  alt={card.title}
+                  style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover' }}
+                />
+                <span style={{ fontWeight: 'bold', fontSize: '0.85rem', marginTop: '6px', color: '#374151' }}>
+                  {card.title}
+                </span>
 
-              {/* Render placed stickers */}
-              {placedIndicesOnCard.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '4px', marginTop: '6px' }}>
-                  {placedIndicesOnCard.map((inventoryIdx, i) => (
-                    <span key={i} style={{ fontSize: '1.2rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
-                      {inventory[inventoryIdx]?.icon}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
+                {/* Render placed stickers */}
+                {placedIndicesOnCard.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '4px', marginTop: '6px' }}>
+                    {placedIndicesOnCard.map((inventoryIdx, i) => (
+                      <span key={i} style={{ fontSize: '1.2rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
+                        {inventory[inventoryIdx]?.icon}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
