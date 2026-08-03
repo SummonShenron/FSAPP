@@ -1,15 +1,26 @@
 import { useAuth } from '@clerk/clerk-react';
 
-const getApiBaseUrl = () => {
-  // 1. If running locally in development, force localhost/local IP
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '192.168.1.6') {
+export const getApiBaseUrl = () => {
+  // If explicitly provided via environment variables (Vite/React)
+  if (import.meta.env?.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+
+  // Local development fallback
+  const isLocalHost = 
+    window.location.hostname === 'localhost' || 
+    window.location.hostname === '127.0.0.1' || 
+    window.location.hostname === '192.168.1.6';
+
+  if (isLocalHost) {
     return 'http://192.168.1.6:8000'; // or http://localhost:8000
   }
-  // 2. Otherwise use your production Render URL
+
+  // Production Render Backend
   return 'https://fsapp-ci88.onrender.com';
 };
 
-const API_BASE_URL = getApiBaseUrl();
+export const API_BASE_URL = getApiBaseUrl();
 
 export const useApiClient = () => {
   const { getToken } = useAuth();

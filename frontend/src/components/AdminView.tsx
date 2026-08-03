@@ -3,6 +3,7 @@ import { SoundCard } from '../../types';
 import { useApiClient } from '../api/useApiClient';
 import { exportCard, importCard } from '../utils/cardSharing';
 import './__styles__/AdminView.css';
+import { API_BASE_URL, getApiBaseUrl } from '../api/useApiClient';
 
 interface Props {
   cards: SoundCard[];
@@ -13,11 +14,16 @@ interface Props {
 export const getPhotoUrl = (url?: string) => {
   if (!url) return 'https://via.placeholder.com/150';
   
-  // If it's already a full URL (http:// or https://), leave it alone
-  if (url.startsWith('http')) return url;
+  // If it's already a full http/https link, use it directly
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    // If an old local testing IP was stored in DB, sanitize it to production!
+    if (url.includes('192.168.1.6:8000') && window.location.hostname !== '192.168.1.6') {
+      return url.replace('http://192.168.1.6:8000', API_BASE_URL);
+    }
+    return url;
+  }
   
-  // Prepend your backend URL if it's a relative backend path (/api/photo/...)
-  const API_BASE_URL = 'http://192.168.1.6:8000'; // Or your Cloudflare backend tunnel URL
+  // Cleanly attach dynamic backend domain
   return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
 };
 
@@ -617,19 +623,23 @@ export const AdminView: React.FC<Props> = ({ cards, onRefresh, onClose }) => {
                 <div className="audio-clips-list" style={{ marginBottom: '1rem' }}>
                   {currentAudioClips.map((clip: any, idx: number) => (
                     <div key={clip.id || idx} className="audio-clip-row">
-                      <button 
-                        type="button" 
-                        className="clip-play-btn" 
-                        onClick={() => {
-                          const audioPath = clip.audio_url || clip.url;
-                          const fullUrl = audioPath?.startsWith('http') 
-                            ? audioPath 
-                            : `http://192.168.1.6:8000${audioPath}`;
-                          new Audio(fullUrl).play();
-                        }}
-                      >
-                        ▶️
-                      </button>
+                     <button 
+                      type="button" 
+                      className="clip-play-btn" 
+                      onClick={() => {
+                        const audioPath = clip.audio_url || clip.url;
+                        if (!audioPath) return;
+                        
+                        // Use getPhotoUrl / resolveAudioUrl logic here instead of hardcoding http://192.168.1.6:8000
+                        const fullUrl = audioPath.startsWith('http') 
+                          ? audioPath 
+                          : `${API_BASE_URL}${audioPath.startsWith('/') ? '' : '/'}${audioPath}`;
+
+                        new Audio(fullUrl).play();
+                      }}
+                    >
+                      ▶️
+                    </button>
                       <div className="clip-info">
                         <span className="clip-label">{clip.label || `Voice Clip ${idx + 1}`}</span>
                       </div>
