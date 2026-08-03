@@ -65,7 +65,7 @@ const SILLY_MONSTERS: SillyMonster[] = [
     id: 'm1',
     name: 'Giggles the Blob',
     avatar: '👾',
-    soundUrl: 'https://assets.mixkit.co/active_storage/sfx/2874/2874-preview.mp3',
+    soundUrl: '/blob-scare.mp3',
     quote: 'BOO! Gotcha!',
     clue: 'Loves purple jelly & tickles!',
   },
@@ -73,7 +73,7 @@ const SILLY_MONSTERS: SillyMonster[] = [
     id: 'm2',
     name: 'Barnaby Big-Mouth',
     avatar: '👹',
-    soundUrl: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
+    soundUrl: '/mixkit-beast-long-roar-306.wav',
     quote: 'RAWR! (Gimme cookies!)',
     clue: 'Always hungry for chocolate chip cookies!',
   },
@@ -81,7 +81,7 @@ const SILLY_MONSTERS: SillyMonster[] = [
     id: 'm3',
     name: 'Snicker-Doodle',
     avatar: '👽',
-    soundUrl: 'https://assets.mixkit.co/active_storage/sfx/131/131-preview.mp3',
+    soundUrl: '/mixkit-little-devil-laughing-413.wav',
     quote: 'TEE-HEE! Wrong door!',
     clue: 'Wears polka dot socks everywhere!',
   },
@@ -89,7 +89,7 @@ const SILLY_MONSTERS: SillyMonster[] = [
     id: 'm4',
     name: 'Fuzzy Wuzzy',
     avatar: '👺',
-    soundUrl: 'https://assets.mixkit.co/active_storage/sfx/2218/2218-preview.mp3',
+    soundUrl: '/mixkit-monster-scream-1961.wav',
     quote: 'BOING! Not here!',
     clue: 'Loves to jump on trampolines!',
   },
@@ -97,7 +97,7 @@ const SILLY_MONSTERS: SillyMonster[] = [
     id: 'm5',
     name: 'Bubbles the Yeti',
     avatar: '👻',
-    soundUrl: 'https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3',
+    soundUrl: '/mixkit-air-whoosh-1491.wav',
     quote: 'WOOSH! Secret Monster!',
     clue: 'Enjoys warm bubble baths!',
   },
@@ -115,18 +115,15 @@ export function DoorModel({ isOpen, isKnocking }: { isOpen: boolean; isKnocking:
   const groupRef = useRef<THREE.Group>(null);
   const leftDoorRef = useRef<THREE.Object3D | null>(null);
   const rightDoorRef = useRef<THREE.Object3D | null>(null);
-
   const { scene } = useGLTF('/doubledoor.glb');
-
   const clonedScene = useMemo(() => {
     const clone = scene.clone();
     leftDoorRef.current = clone.getObjectByName('Door_DoubleLeft') || null;
     rightDoorRef.current = clone.getObjectByName('Door_DoubleRight') || null;
     return clone;
   }, [scene]);
-
+  
   const SWING_ANGLE = Math.PI * 0.77; 
-
   useFrame((state, delta) => {
     if (leftDoorRef.current) {
       const targetLeftY = isOpen ? -SWING_ANGLE : 0;
@@ -194,13 +191,47 @@ export const CSSDoorCard: React.FC<Door3DCardProps> = ({
     <div
       onClick={onClick}
       className={`css-door-container ${isKnocking ? 'knocking' : ''}`}
+      style={{ position: 'relative' }} // Ensure the mask positions correctly inside the container
     >
+      {/* ✨ NEW: Black interior mask to hide the monster until opened */}
+      <div
+        className="doorway-interior-mask"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundColor: 'black',
+          zIndex: 1, // Sits behind the door panel, but in front of the monster
+          transition: 'opacity 0.3s ease',
+          opacity: isOpen ? 0 : 1, // Fades away when the door opens!
+          pointerEvents: 'none', // Prevents this layer from blocking clicks
+        }}
+      >
+        {/* ✨ FIXED: Positioned perfectly inside the black doorway */}
+        {isAjar && !isOpen && (
+          <div
+            className="eyes-in-shadow"
+            style={{
+              position: 'absolute',
+              left: '85%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)', // Centers the eyes perfectly
+              fontSize: '2.5rem', // Ensures they are large enough to see
+              zIndex: 2,
+            }}
+          >
+            👀
+          </div>
+        )}
+      </div>
+
+      {/* The 3D Door Panel */}
       <div
         className={`css-door-panel ${doorState}`}
         style={{
           background: color.background,
           borderColor: color.border,
           borderRightColor: color.highlight,
+          zIndex: 5, // Ensures the door sits above the black interior mask
         }}
       >
         {doorNumber && (
@@ -288,8 +319,48 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
     unlockedGoldFrames,
     submitGuess,
     restartGame,
+    resetAllProgress,
   } = engine;
-
+  const API_BASE_URL =
+    import.meta.env.VITE_API_URL ||
+    (window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === '192.168.1.6'
+      ? 'http://192.168.1.6:8000'
+      : 'https://fsapp-ci88.onrender.com');
+  const resolveAudioUrl = (audioPath: string) => {
+    if (!audioPath) return '';
+    if (audioPath.startsWith('http')) return audioPath;
+    return `${API_BASE_URL}${audioPath.startsWith('/') ? '' : '/'}${audioPath}`;
+  };
+  const playPublicSound = (audioPath: string, volume = 0.5) => {
+    const audio = new Audio(audioPath);
+    audio.volume = volume;
+    audio.play().catch(() => {});
+  };
+  const playMonsterDoorSound = (audioUrl: string) => {
+    const finalUrl = audioUrl.startsWith('/')
+      ? new URL(audioUrl, window.location.origin).toString()
+      : resolveAudioUrl(audioUrl);
+    const audio = new Audio(finalUrl);
+    audio.volume = 0.55;
+    audio.play().catch(() => {});
+  };
+  const playRoundTransitionSound = () => {
+    playPublicSound('/mixkit-arrow-whoosh-1491.wav', 0.35);
+  };
+  const playDoorRevealSound = () => {
+    playPublicSound('/mixkit-cinematic-wind-swoosh-1471.wav', 0.35);
+  };
+  const playDoorOpenSound = () => {
+    playPublicSound('/mixkit-creaky-door-open-195.wav', 0.45);
+  };
+  const playDoorShutSound = () => {
+    playPublicSound('/mixkit-automatic-door-shut-204.wav', 0.45);
+  };
+  const playCorrectDoorSound = () => {
+    playPublicSound('/mixkit-one-man-clapping-482.wav', 0.55);
+  };
   const [targetCard, setTargetCard] = useState<RoundCard | null>(null);
   const [doorSlots, setDoorSlots] = useState<DoorSlot[]>([]);
   const [activeFilter, setActiveFilter] = useState<VoiceFilter>('normal');
@@ -300,22 +371,14 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
   const [showNewGameWarning, setShowNewGameWarning] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const WHOOSH_SOUND_URL = '/whoosh.mp3';
-  
   const [roundKey, setRoundKey] = useState<number>(1);
   const [isExiting, setIsExiting] = useState<boolean>(false);
-
+  const [ajarDoorId, setAjarDoorId] = useState<string | null>(null);
   const startNewRound = () => {
     // 1. Guard clause: ensure we have cards to play with
     if (cards.length < 1) return;
-    
-    // Play Whoosh Sound
-    try {
-      const whooshSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3');
-      whooshSound.volume = 0.3;
-      whooshSound.play().catch(() => {});
-    } catch (e) {
-      // Ignore if browser restricts autoplay
-    }
+
+    playDoorRevealSound();
 
     // Increment round key to force animation reset
     setRoundKey(prev => prev + 1);
@@ -394,11 +457,10 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
     setWonSticker(null);
     setIsKnocking(false);
   };
-
   const handleNextRound = () => {
     if (isExiting) return; // Prevent double-clicking during animation
+    playRoundTransitionSound();
     setIsExiting(true);
-
     // Wait for exit animation & stagger delay to complete (approx 550ms)
     setTimeout(() => {
       startNewRound();
@@ -413,7 +475,7 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
   const handlePlaySound = () => {
     if (!targetCard) return;
 
-    const clips = (targetCard as any).audio_clips || [];
+    const clips = (targetCard as any).audio_clips || []; 
     const audioPath = clips.length > 0 
       ? clips[Math.floor(Math.random() * clips.length)].audio_url 
       : (targetCard as any).audio_url;
@@ -421,9 +483,7 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
     if (!audioPath) return;
 
     setIsKnocking(true);
-    const fullAudioUrl = audioPath.startsWith('http') 
-      ? audioPath 
-      : `http://192.168.1.6:8000${audioPath}`;
+    const fullAudioUrl = resolveAudioUrl(audioPath);
 
     const audio = playModifiedAudio(fullAudioUrl, activeFilter);
 
@@ -434,35 +494,159 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
     }
   };
 
+  const WRONG_DOOR_SCARE_SOUNDS = [
+    'https://assets.mixkit.co/active_storage/sfx/2874/2874-preview.mp3',
+    'https://assets.mixkit.co/active_storage/sfx/2218/2218-preview.mp3',
+    'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
+  ];
+
+  const playWrongDoorScare = (monsterId?: string) => {
+  const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+  if (!AudioContextClass) return;
+
+  const ctx = new AudioContextClass();
+  const master = ctx.createGain();
+  master.gain.value = 0.16;
+  master.connect(ctx.destination);
+
+  const derivedIndex = monsterId
+    ? [...monsterId].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 3
+    : Math.floor(Math.random() * 3);
+
+  if (derivedIndex === 0) {
+    // 1) Sharp buzz
+    const oscA = ctx.createOscillator();
+    const oscB = ctx.createOscillator();
+    const filter = ctx.createBiquadFilter();
+
+    oscA.type = 'sawtooth';
+    oscB.type = 'square';
+
+    oscA.frequency.setValueAtTime(260, ctx.currentTime);
+    oscA.frequency.exponentialRampToValueAtTime(42, ctx.currentTime + 0.24);
+
+    oscB.frequency.setValueAtTime(180, ctx.currentTime);
+    oscB.frequency.exponentialRampToValueAtTime(36, ctx.currentTime + 0.24);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(900, ctx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(220, ctx.currentTime + 0.28);
+
+    oscA.connect(filter);
+    oscB.connect(filter);
+    filter.connect(master);
+
+    oscA.start();
+    oscB.start();
+    oscA.stop(ctx.currentTime + 0.28);
+    oscB.stop(ctx.currentTime + 0.28);
+  } else if (derivedIndex === 1) {
+    // 2) Wobble whine
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(160, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(56, ctx.currentTime + 0.32);
+
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.16, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.32);
+
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(320, ctx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.32);
+    filter.Q.value = 0.9;
+
+    osc.connect(gain);
+    gain.connect(filter);
+    filter.connect(master);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.32);
+  } else {
+    // 3) Gritty screech
+    const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.3, ctx.sampleRate);
+    const channel = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < channel.length; i++) {
+      channel[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / channel.length, 2);
+    }
+
+    const noise = ctx.createBufferSource();
+    const noiseFilter = ctx.createBiquadFilter();
+    const noiseGain = ctx.createGain();
+
+    noise.buffer = noiseBuffer;
+    noiseFilter.type = 'highpass';
+    noiseFilter.frequency.setValueAtTime(900, ctx.currentTime);
+    noiseFilter.frequency.exponentialRampToValueAtTime(260, ctx.currentTime + 0.28);
+
+    noiseGain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    noiseGain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.02);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.28);
+
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(master);
+
+    noise.start();
+    noise.stop(ctx.currentTime + 0.28);
+  }
+};
+
   const handleDoorClick = (slot: DoorSlot) => {
-    // If a door has already been selected this round, ignore clicks
     if (selectedDoorId || gameState !== 'PLAYING') return;
-    
+
+    playDoorOpenSound();
     setSelectedDoorId(slot.id);
     setIsKnocking(false);
 
     if (slot.type === 'PERSON') {
-      // Correct Guess!
       submitGuess(true);
-
+      playCorrectDoorSound();
       const clips = (slot.card as any).audio_clips || [];
       const audioPath = clips.length > 0 ? clips[0].audio_url : (slot.card as any).audio_url;
+
       if (audioPath) {
-        const fullUrl = audioPath.startsWith('http') ? audioPath : `http://192.168.1.6:8000${audioPath}`;
+        const fullUrl = resolveAudioUrl(audioPath);
         playModifiedAudio(fullUrl, 'normal');
       }
+
       const reward = STICKERS[Math.floor(Math.random() * STICKERS.length)];
       setWonSticker(reward);
       onRewardSticker(slot.card.id, reward);
     } else {
-      // Monster Clicked!
       submitGuess(false);
-
-      const monsterAudio = new Audio(slot.monster.soundUrl);
-      monsterAudio.volume = 0.5;
-      monsterAudio.play().catch(() => {});
+      playMonsterDoorSound(slot.monster.soundUrl);
     }
   };
+
+  useEffect(() => {
+    // Don't trigger while the start screen is visible, the game isn't playing,
+    // a door is open, or we are transitioning.
+    if (currentScreen !== 'GAME' || gameState !== 'PLAYING' || selectedDoorId !== null || isExiting) {
+      setAjarDoorId(null);
+      return;
+    }
+    const ajarInterval = setInterval(() => {
+      // 40% chance to trigger every 3 seconds
+      if (Math.random() > 0.6 && doorSlots.length > 0) {
+        // Pick a random door slot
+        const randomSlot = doorSlots[Math.floor(Math.random() * doorSlots.length)];
+        setAjarDoorId(randomSlot.id);
+        playDoorOpenSound();
+
+        // Snap the door shut after 1.5 seconds
+        setTimeout(() => {
+          setAjarDoorId(null);
+          playDoorShutSound();
+        }, 1500);
+      }
+    }, 3000);
+
+    return () => clearInterval(ajarInterval);
+  }, [doorSlots, currentScreen, gameState, selectedDoorId, isExiting]);
   
   // --- START SCREEN VIEW ---
   if (currentScreen === 'START') {
@@ -561,7 +745,7 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
                   className="btn-primary" 
                   onClick={() => {
                     setShowNewGameWarning(false);
-                    restartGame();
+                    resetAllProgress();
                     startNewRound();
                     setCurrentScreen('GAME');
                   }}
@@ -691,9 +875,9 @@ export const KnockGame: React.FC<Props> = ({ cards, onRewardSticker, engine }) =
                 <div style={{ position: 'absolute', inset: 0, zIndex: 5 }}>
                   <CSSDoorCard
                     doorNumber={index + 1}
-                    isOpen={isRevealed}
+                    isOpen={isRevealed && !isExiting}
+                    isAjar={ajarDoorId === slot.id}
                     isKnocking={isKnocking}
-                    isAjar={false}
                     color={slot.color}
                     monsterFeature={slot.monsterFeature}
                     onClick={() => handleDoorClick(slot)}
