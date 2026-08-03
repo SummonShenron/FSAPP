@@ -564,9 +564,11 @@
 
 /* 🚀 SWING ALL THE WAY OPEN ON CLICK */
 .css-door-panel.open {
-  transform: rotateY(-110deg);
+  transform: rotateY(-80deg);
 }
-
+.css-door-panel.ajar {
+  transform: rotateY(-25deg);
+}
 /* Slide in from off-screen right with elastic stretch & wiggle */
 /* ==========================================================================
    JUICY SLIDE-IN ENTRANCE ANIMATION
